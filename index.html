@@ -1,0 +1,1137 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>部門 SOP 助理</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+      background: #f0f2f5;
+      color: #1a1a2e;
+    }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width: 240px;
+      min-width: 240px;
+      background: #1a2332;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      padding: 0;
+      overflow-y: auto;
+    }
+
+    .sidebar-header {
+      padding: 20px 16px 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .sidebar-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 4px;
+    }
+
+    .sidebar-logo .icon {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, #4f8ef7, #7c5cfc);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+    }
+
+    .sidebar-logo h1 { font-size: 15px; font-weight: 700; letter-spacing: 0.3px; }
+    .sidebar-logo p { font-size: 10px; color: rgba(255,255,255,0.45); letter-spacing: 1px; text-transform: uppercase; }
+
+    .sidebar-section { padding: 12px 16px 8px; }
+    .sidebar-section-title {
+      font-size: 10px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.35);
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .quick-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      padding: 9px 12px;
+      margin-bottom: 4px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
+      color: rgba(255,255,255,0.8);
+      font-size: 12.5px;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.15s;
+    }
+
+    .quick-btn:hover {
+      background: rgba(79,142,247,0.2);
+      border-color: rgba(79,142,247,0.4);
+      color: #fff;
+    }
+
+    .quick-btn .dot {
+      width: 6px; height: 6px;
+      background: #4f8ef7;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .sidebar-footer {
+      margin-top: auto;
+      padding: 12px 16px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .settings-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      padding: 9px 12px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
+      color: rgba(255,255,255,0.7);
+      font-size: 12.5px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .settings-btn:hover {
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+    }
+
+    .sop-status {
+      margin-top: 8px;
+      padding: 6px 12px;
+      font-size: 11px;
+      color: rgba(255,255,255,0.35);
+      text-align: center;
+    }
+
+    .sop-status.loaded { color: #4ade80; }
+    .sop-status.error { color: #f87171; }
+
+    /* ── Chat Panel ── */
+    .chat-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: #fff;
+      min-width: 0;
+    }
+
+    .chat-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid #e8eaf0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #fff;
+    }
+
+    .chat-header h2 { font-size: 16px; font-weight: 700; color: #1a1a2e; }
+    .chat-header p { font-size: 12px; color: #8892a4; margin-top: 2px; }
+
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .message {
+      display: flex;
+      gap: 10px;
+      max-width: 85%;
+    }
+
+    .message.user { align-self: flex-end; flex-direction: row-reverse; }
+    .message.bot { align-self: flex-start; }
+
+    .message-avatar {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px;
+      flex-shrink: 0;
+    }
+
+    .message.user .message-avatar { background: #4f8ef7; color: #fff; }
+    .message.bot .message-avatar {
+      background: linear-gradient(135deg, #4f8ef7, #7c5cfc);
+      color: #fff;
+    }
+
+    .message-content { display: flex; flex-direction: column; gap: 6px; }
+
+    .message-bubble {
+      padding: 12px 16px;
+      border-radius: 16px;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .message.user .message-bubble {
+      background: #4f8ef7;
+      color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+
+    .message.bot .message-bubble {
+      background: #f5f7fa;
+      color: #1a1a2e;
+      border-bottom-left-radius: 4px;
+      border: 1px solid #e8eaf0;
+    }
+
+    /* Markdown styles inside bot bubble */
+    .message.bot .message-bubble h1,
+    .message.bot .message-bubble h2,
+    .message.bot .message-bubble h3 {
+      font-size: 14px;
+      font-weight: 700;
+      margin: 10px 0 6px;
+      color: #1a1a2e;
+    }
+
+    .message.bot .message-bubble p { margin-bottom: 8px; }
+    .message.bot .message-bubble p:last-child { margin-bottom: 0; }
+
+    .message.bot .message-bubble ul,
+    .message.bot .message-bubble ol {
+      padding-left: 20px;
+      margin-bottom: 8px;
+    }
+
+    .message.bot .message-bubble li { margin-bottom: 4px; }
+
+    .message.bot .message-bubble strong { font-weight: 700; color: #1a1a2e; }
+
+    .message.bot .message-bubble code {
+      background: #e8eaf0;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 12px;
+    }
+
+    /* Source badge */
+    .source-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      background: #eef2ff;
+      border: 1px solid #c7d2fe;
+      border-radius: 20px;
+      font-size: 11.5px;
+      color: #4f46e5;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-decoration: none;
+      width: fit-content;
+    }
+
+    .source-badge:hover { background: #e0e7ff; }
+    .source-badge.none { background: #f5f5f5; border-color: #e0e0e0; color: #888; cursor: default; }
+
+    /* Follow-up chips */
+    .followup-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .followup-chip {
+      padding: 5px 12px;
+      background: #fff;
+      border: 1px solid #d1d5db;
+      border-radius: 20px;
+      font-size: 12px;
+      color: #374151;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .followup-chip:hover {
+      background: #f0f4ff;
+      border-color: #4f8ef7;
+      color: #4f8ef7;
+    }
+
+    /* Typing indicator */
+    .typing-indicator {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      background: #f5f7fa;
+      border-radius: 16px;
+      border-bottom-left-radius: 4px;
+      border: 1px solid #e8eaf0;
+      width: fit-content;
+    }
+
+    .typing-dots { display: flex; gap: 4px; }
+
+    .typing-dots span {
+      width: 7px; height: 7px;
+      background: #8892a4;
+      border-radius: 50%;
+      animation: bounce 1.2s infinite;
+    }
+
+    .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes bounce {
+      0%, 60%, 100% { transform: translateY(0); }
+      30% { transform: translateY(-5px); }
+    }
+
+    /* Chat input */
+    .chat-input-area {
+      padding: 16px 20px;
+      border-top: 1px solid #e8eaf0;
+      background: #fff;
+    }
+
+    .chat-input-wrapper {
+      display: flex;
+      align-items: flex-end;
+      gap: 10px;
+      background: #f5f7fa;
+      border: 1.5px solid #e8eaf0;
+      border-radius: 14px;
+      padding: 10px 14px;
+      transition: border-color 0.15s;
+    }
+
+    .chat-input-wrapper:focus-within {
+      border-color: #4f8ef7;
+      background: #fff;
+    }
+
+    #messageInput {
+      flex: 1;
+      border: none;
+      background: transparent;
+      font-size: 14px;
+      color: #1a1a2e;
+      outline: none;
+      resize: none;
+      min-height: 20px;
+      max-height: 120px;
+      line-height: 1.5;
+      font-family: inherit;
+    }
+
+    #messageInput::placeholder { color: #aab0bc; }
+
+    .send-btn {
+      width: 36px; height: 36px;
+      background: #4f8ef7;
+      border: none;
+      border-radius: 10px;
+      color: #fff;
+      font-size: 16px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      transition: background 0.15s;
+    }
+
+    .send-btn:hover { background: #3b7de8; }
+    .send-btn:disabled { background: #c4cdd6; cursor: not-allowed; }
+
+    /* ── Doc Panel ── */
+    .doc-panel {
+      width: 300px;
+      min-width: 300px;
+      background: #fff;
+      border-left: 1px solid #e8eaf0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .doc-panel-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid #e8eaf0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .doc-panel-header h3 { font-size: 14px; font-weight: 700; color: #1a1a2e; }
+
+    .doc-panel-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 20px;
+    }
+
+    .doc-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 200px;
+      color: #b0b8c4;
+      text-align: center;
+      font-size: 13px;
+      gap: 10px;
+    }
+
+    .doc-empty .icon { font-size: 36px; opacity: 0.4; }
+
+    .doc-source-card {
+      border: 1px solid #e8eaf0;
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+
+    .doc-source-header {
+      padding: 10px 14px;
+      background: #f5f7fa;
+      border-bottom: 1px solid #e8eaf0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .doc-source-header span { font-size: 12.5px; font-weight: 600; color: #4f46e5; }
+    .doc-source-header small { font-size: 11px; color: #8892a4; margin-left: auto; }
+
+    .doc-source-excerpt {
+      padding: 12px 14px;
+      font-size: 12.5px;
+      color: #4b5563;
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+
+    .doc-source-link {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 10px;
+      background: #f5f7fa;
+      border-top: 1px solid #e8eaf0;
+      color: #4f8ef7;
+      font-size: 12.5px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: background 0.15s;
+    }
+
+    .doc-source-link:hover { background: #eef2ff; }
+
+    /* ── Settings Modal ── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-overlay.active { display: flex; }
+
+    .modal {
+      background: #fff;
+      border-radius: 16px;
+      padding: 28px;
+      width: 440px;
+      max-width: 90vw;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    }
+
+    .modal h2 { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+    .modal p { font-size: 13px; color: #6b7280; margin-bottom: 20px; }
+
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px; }
+
+    .form-group select,
+    .form-group input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1.5px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: 13.5px;
+      color: #1a1a2e;
+      outline: none;
+      transition: border-color 0.15s;
+      font-family: inherit;
+    }
+
+    .form-group select:focus,
+    .form-group input:focus { border-color: #4f8ef7; }
+
+    .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+
+    .btn-primary {
+      flex: 1;
+      padding: 11px;
+      background: #4f8ef7;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .btn-primary:hover { background: #3b7de8; }
+
+    .btn-secondary {
+      padding: 11px 20px;
+      background: #f5f7fa;
+      color: #374151;
+      border: 1.5px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .btn-secondary:hover { background: #e5e7eb; }
+
+    .welcome-message {
+      text-align: center;
+      padding: 40px 20px;
+      color: #8892a4;
+    }
+
+    .welcome-message .emoji { font-size: 48px; margin-bottom: 12px; }
+    .welcome-message h3 { font-size: 16px; font-weight: 700; color: #1a1a2e; margin-bottom: 8px; }
+    .welcome-message p { font-size: 13px; line-height: 1.6; }
+  </style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside class="sidebar">
+  <div class="sidebar-header">
+    <div class="sidebar-logo">
+      <div class="icon">🤖</div>
+      <div>
+        <h1>SOP 助理</h1>
+        <p>AI Assistant</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-section-title">快速提問</div>
+    <div id="quickButtons">
+      <div style="font-size:12px;color:rgba(255,255,255,0.3);padding:8px 0;">載入文件中...</div>
+    </div>
+  </div>
+
+  <div class="sidebar-footer">
+    <button class="settings-btn" onclick="openSettings()">
+      ⚙️ API 設定
+    </button>
+    <div class="sop-status" id="sopStatus">尚未載入文件</div>
+  </div>
+</aside>
+
+<!-- Chat Panel -->
+<main class="chat-panel">
+  <div class="chat-header">
+    <div>
+      <h2>Chat & Guides</h2>
+      <p>根據部門 SOP 文件回答工作問題</p>
+    </div>
+  </div>
+
+  <div class="chat-messages" id="chatMessages">
+    <div class="welcome-message">
+      <div class="emoji">💬</div>
+      <h3>有什麼工作上的問題嗎？</h3>
+      <p>我會根據部門的 SOP 文件來回答<br>點左側快捷按鈕或直接輸入問題</p>
+    </div>
+  </div>
+
+  <div class="chat-input-area">
+    <div class="chat-input-wrapper">
+      <textarea
+        id="messageInput"
+        placeholder="輸入你的問題..."
+        rows="1"
+        onkeydown="handleKeyDown(event)"
+        oninput="autoResize(this)"
+      ></textarea>
+      <button class="send-btn" id="sendBtn" onclick="sendMessage()">➤</button>
+    </div>
+  </div>
+</main>
+
+<!-- Doc Panel -->
+<aside class="doc-panel">
+  <div class="doc-panel-header">
+    <h3>📄 Document Context</h3>
+  </div>
+  <div class="doc-panel-body" id="docPanelBody">
+    <div class="doc-empty">
+      <div class="icon">📂</div>
+      <p>回答後這裡會顯示<br>引用的資料來源</p>
+    </div>
+  </div>
+</aside>
+
+<!-- Settings Modal -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal">
+    <h2>⚙️ API 設定</h2>
+    <p>設定 AI 模型的 API Key，儲存在你的瀏覽器本機，不會上傳到任何伺服器。</p>
+
+    <div class="form-group">
+      <label>AI 模型提供商</label>
+      <select id="providerSelect" onchange="updateModelOptions()">
+        <option value="gemini">Google Gemini</option>
+        <option value="openai">OpenAI</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>模型</label>
+      <select id="modelSelect"></select>
+    </div>
+
+    <div class="form-group">
+      <label>API Key</label>
+      <input type="password" id="apiKeyInput" placeholder="貼上你的 API Key" autocomplete="off" />
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeSettings()">取消</button>
+      <button class="btn-primary" onclick="saveSettings()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ═══════════════════════════════════════
+  // CONFIG（硬編碼，不需要用戶填寫）
+  // ═══════════════════════════════════════
+  const DRIVE_API_KEY = 'AIzaSyCL2ntyvU8nZSQN6DnCOvXfLeaqwIFyCj4';
+  const FOLDER_ID = '14f1vaC46t0BJp-WkhbrnuWnl7qijQ1C6';
+
+  const MODELS = {
+    gemini: ['gemini-2.0-flash', 'gemini-2.5-flash-preview-04-17', 'gemini-1.5-flash', 'gemini-1.5-pro'],
+    openai: ['gpt-4o-mini', 'gpt-4o', 'gpt-3.5-turbo']
+  };
+
+  const SYSTEM_PROMPT = `你是部門的工作助理，專門根據 SOP 文件回答同事的工作問題。
+回答一律使用繁體中文。
+
+以下是所有可參考的 SOP 文件：
+
+{context}
+
+回答規則：
+1. 只根據上方文件內容回答，不自行推測或補充文件中沒有的資訊
+2. 問題明確時直接回答；問題模糊且不同情境答案不同時，先問一個最關鍵的問題（最多追問一次）
+3. 找不到答案時說：「這個問題我目前的資料裡沒有，建議詢問主管」
+4. 回答條列重點，步驟用數字編號，每步驟寫清楚做什麼、在哪裡做
+5. 回答末尾另起一行，必須加上（注意格式要完全一致）：
+   【資料來源：文件名稱】
+   若參考多份文件：【資料來源：文件名稱1、文件名稱2】
+   若無相關資料：【資料來源：無】
+6. 再另起一行，提供 2-3 個可能的後續問題（注意格式要完全一致）：
+   【後續問題：問題一|問題二|問題三】`;
+
+  // ═══════════════════════════════════════
+  // STATE
+  // ═══════════════════════════════════════
+  let sopFiles = [];
+  let conversationHistory = [];
+  let isLoading = false;
+
+  // ═══════════════════════════════════════
+  // SETTINGS
+  // ═══════════════════════════════════════
+  function loadSettings() {
+    return {
+      provider: localStorage.getItem('sop_provider') || 'gemini',
+      model: localStorage.getItem('sop_model') || 'gemini-2.0-flash',
+      apiKey: localStorage.getItem('sop_apikey') || ''
+    };
+  }
+
+  function updateModelOptions() {
+    const provider = document.getElementById('providerSelect').value;
+    const modelSelect = document.getElementById('modelSelect');
+    modelSelect.innerHTML = MODELS[provider].map(m => `<option value="${m}">${m}</option>`).join('');
+    const saved = localStorage.getItem('sop_model');
+    if (saved && MODELS[provider].includes(saved)) modelSelect.value = saved;
+  }
+
+  function openSettings() {
+    const s = loadSettings();
+    document.getElementById('providerSelect').value = s.provider;
+    updateModelOptions();
+    document.getElementById('modelSelect').value = s.model;
+    document.getElementById('apiKeyInput').value = s.apiKey;
+    document.getElementById('settingsModal').classList.add('active');
+  }
+
+  function closeSettings() {
+    document.getElementById('settingsModal').classList.remove('active');
+  }
+
+  function saveSettings() {
+    const provider = document.getElementById('providerSelect').value;
+    const model = document.getElementById('modelSelect').value;
+    const apiKey = document.getElementById('apiKeyInput').value.trim();
+    if (!apiKey) { alert('請填入 API Key'); return; }
+    localStorage.setItem('sop_provider', provider);
+    localStorage.setItem('sop_model', model);
+    localStorage.setItem('sop_apikey', apiKey);
+    closeSettings();
+
+    const status = document.getElementById('sopStatus');
+    status.textContent = `✓ ${provider === 'gemini' ? 'Gemini' : 'OpenAI'} 已設定`;
+    status.className = 'sop-status loaded';
+  }
+
+  // Close modal on overlay click
+  document.getElementById('settingsModal').addEventListener('click', function(e) {
+    if (e.target === this) closeSettings();
+  });
+
+  // ═══════════════════════════════════════
+  // GOOGLE DRIVE
+  // ═══════════════════════════════════════
+  async function loadSOPs() {
+    const statusEl = document.getElementById('sopStatus');
+    const quickBtns = document.getElementById('quickButtons');
+
+    try {
+      statusEl.textContent = '載入文件中...';
+      statusEl.className = 'sop-status';
+
+      const listRes = await fetch(
+        `https://www.googleapis.com/drive/v3/files?q=%27${FOLDER_ID}%27+in+parents+and+trashed=false&fields=files(id,name,mimeType,webViewLink)&key=${DRIVE_API_KEY}`
+      );
+
+      if (!listRes.ok) {
+        const err = await listRes.json();
+        throw new Error(err.error?.message || '無法存取 Google Drive');
+      }
+
+      const listData = await listRes.json();
+      const files = listData.files || [];
+
+      if (files.length === 0) {
+        statusEl.textContent = '資料夾目前沒有文件';
+        statusEl.className = 'sop-status';
+        quickBtns.innerHTML = '<div style="font-size:12px;color:rgba(255,255,255,0.3);padding:8px 0;">尚無 SOP 文件</div>';
+        return;
+      }
+
+      sopFiles = [];
+      for (const file of files) {
+        try {
+          let content = '';
+          if (file.mimeType === 'application/vnd.google-apps.document') {
+            const res = await fetch(
+              `https://www.googleapis.com/drive/v3/files/${file.id}/export?mimeType=text%2Fplain&key=${DRIVE_API_KEY}`
+            );
+            content = await res.text();
+          } else {
+            const res = await fetch(
+              `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media&key=${DRIVE_API_KEY}`
+            );
+            content = await res.text();
+          }
+          const cleanName = file.name.replace(/\.[^.]+$/, '');
+          sopFiles.push({ ...file, name: cleanName, originalName: file.name, content });
+        } catch (e) {
+          console.warn(`無法載入文件 ${file.name}:`, e);
+        }
+      }
+
+      // Generate quick buttons
+      quickBtns.innerHTML = '';
+      sopFiles.forEach(f => {
+        const btn = document.createElement('button');
+        btn.className = 'quick-btn';
+        btn.innerHTML = `<span class="dot"></span>${f.name}`;
+        btn.onclick = () => {
+          document.getElementById('messageInput').value = `${f.name} 的流程是什麼？`;
+          sendMessage();
+        };
+        quickBtns.appendChild(btn);
+      });
+
+      statusEl.textContent = `✓ 已載入 ${sopFiles.length} 份文件`;
+      statusEl.className = 'sop-status loaded';
+
+    } catch (e) {
+      console.error(e);
+      statusEl.textContent = '⚠ 文件載入失敗';
+      statusEl.className = 'sop-status error';
+      quickBtns.innerHTML = `<div style="font-size:11px;color:#f87171;padding:8px 4px;">載入失敗：${e.message}</div>`;
+    }
+  }
+
+  function buildContext() {
+    if (sopFiles.length === 0) return '（目前沒有可參考的 SOP 文件）';
+    return sopFiles.map(f =>
+      `=== 文件：${f.name} ===\n${f.content}`
+    ).join('\n\n---\n\n');
+  }
+
+  // ═══════════════════════════════════════
+  // AI CALLS
+  // ═══════════════════════════════════════
+  async function callAI(userMessage) {
+    const { provider, model, apiKey } = loadSettings();
+    if (!apiKey) throw new Error('請先在設定中填入 API Key（點左下角 ⚙️）');
+
+    const context = buildContext();
+    const systemPrompt = SYSTEM_PROMPT.replace('{context}', context);
+
+    if (provider === 'gemini') return callGemini(apiKey, model, systemPrompt, userMessage);
+    if (provider === 'openai') return callOpenAI(apiKey, model, systemPrompt, userMessage);
+    throw new Error('未知的 AI 提供商');
+  }
+
+  async function callGemini(apiKey, model, systemPrompt, userMessage) {
+    const history = conversationHistory.map(m => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }]
+    }));
+
+    history.push({ role: 'user', parts: [{ text: userMessage }] });
+
+    const body = {
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      contents: history,
+      generationConfig: { temperature: 0.3, maxOutputTokens: 2048 }
+    };
+
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+    );
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error?.message || 'Gemini API 錯誤');
+    }
+
+    const data = await res.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || '抱歉，無法取得回答。';
+  }
+
+  async function callOpenAI(apiKey, model, systemPrompt, userMessage) {
+    const messages = [
+      { role: 'system', content: systemPrompt },
+      ...conversationHistory,
+      { role: 'user', content: userMessage }
+    ];
+
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify({ model, messages, temperature: 0.3, max_tokens: 2048 })
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error?.message || 'OpenAI API 錯誤');
+    }
+
+    const data = await res.json();
+    return data.choices?.[0]?.message?.content || '抱歉，無法取得回答。';
+  }
+
+  // ═══════════════════════════════════════
+  // PARSE RESPONSE
+  // ═══════════════════════════════════════
+  function parseResponse(text) {
+    const sourceMatch = text.match(/【資料來源：(.+?)】/);
+    const followupMatch = text.match(/【後續問題：(.+?)】/);
+
+    const source = sourceMatch ? sourceMatch[1].trim() : null;
+    const followups = followupMatch
+      ? followupMatch[1].split('|').map(q => q.trim()).filter(Boolean)
+      : [];
+
+    let answer = text
+      .replace(/【資料來源：.+?】/g, '')
+      .replace(/【後續問題：.+?】/g, '')
+      .trim();
+
+    return { answer, source, followups };
+  }
+
+  function getSourceFile(sourceName) {
+    if (!sourceName || sourceName === '無') return null;
+    const names = sourceName.split('、');
+    const results = [];
+    for (const name of names) {
+      const file = sopFiles.find(f =>
+        f.name.toLowerCase().includes(name.trim().toLowerCase()) ||
+        name.trim().toLowerCase().includes(f.name.toLowerCase())
+      );
+      if (file) results.push(file);
+    }
+    return results.length > 0 ? results : null;
+  }
+
+  function getExcerpt(file, userMessage) {
+    if (!file || !file.content) return '';
+    const lines = file.content.split('\n').filter(l => l.trim());
+    const query = userMessage.toLowerCase();
+    let bestLine = 0;
+    let bestScore = 0;
+
+    for (let i = 0; i < lines.length; i++) {
+      const words = query.split(/\s+/);
+      const score = words.filter(w => lines[i].toLowerCase().includes(w)).length;
+      if (score > bestScore) { bestScore = score; bestLine = i; }
+    }
+
+    const start = Math.max(0, bestLine - 1);
+    return lines.slice(start, start + 6).join('\n').slice(0, 300);
+  }
+
+  // ═══════════════════════════════════════
+  // UI
+  // ═══════════════════════════════════════
+  function appendMessage(role, content, source, followups, userMessage) {
+    const container = document.getElementById('chatMessages');
+
+    // Remove welcome message
+    const welcome = container.querySelector('.welcome-message');
+    if (welcome) welcome.remove();
+
+    const wrap = document.createElement('div');
+    wrap.className = `message ${role}`;
+
+    const avatar = document.createElement('div');
+    avatar.className = 'message-avatar';
+    avatar.textContent = role === 'user' ? '👤' : '🤖';
+
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'message-content';
+
+    const bubble = document.createElement('div');
+    bubble.className = 'message-bubble';
+
+    if (role === 'user') {
+      bubble.textContent = content;
+    } else {
+      bubble.innerHTML = marked.parse(content);
+    }
+
+    contentDiv.appendChild(bubble);
+
+    // Source badge
+    if (role === 'bot') {
+      if (source && source !== '無') {
+        const sourceFiles = getSourceFile(source);
+        const badge = document.createElement('a');
+        badge.className = 'source-badge';
+
+        if (sourceFiles && sourceFiles.length > 0) {
+          badge.href = sourceFiles[0].webViewLink || '#';
+          badge.target = '_blank';
+          badge.innerHTML = `📄 ${source}`;
+        } else {
+          badge.className = 'source-badge none';
+          badge.innerHTML = `📄 ${source}`;
+        }
+        contentDiv.appendChild(badge);
+
+        // Update doc panel
+        updateDocPanel(sourceFiles, source, userMessage);
+      } else {
+        updateDocPanel(null, null, null);
+      }
+
+      // Follow-up chips
+      if (followups && followups.length > 0) {
+        const chipsDiv = document.createElement('div');
+        chipsDiv.className = 'followup-chips';
+        followups.forEach(q => {
+          const chip = document.createElement('button');
+          chip.className = 'followup-chip';
+          chip.textContent = q;
+          chip.onclick = () => {
+            document.getElementById('messageInput').value = q;
+            sendMessage();
+          };
+          chipsDiv.appendChild(chip);
+        });
+        contentDiv.appendChild(chipsDiv);
+      }
+    }
+
+    wrap.appendChild(avatar);
+    wrap.appendChild(contentDiv);
+    container.appendChild(wrap);
+    container.scrollTop = container.scrollHeight;
+    return wrap;
+  }
+
+  function showTyping() {
+    const container = document.getElementById('chatMessages');
+    const wrap = document.createElement('div');
+    wrap.className = 'message bot';
+    wrap.id = 'typingIndicator';
+
+    const avatar = document.createElement('div');
+    avatar.className = 'message-avatar';
+    avatar.textContent = '🤖';
+
+    const indicator = document.createElement('div');
+    indicator.className = 'typing-indicator';
+    indicator.innerHTML = `<div class="typing-dots"><span></span><span></span><span></span></div>`;
+
+    wrap.appendChild(avatar);
+    wrap.appendChild(indicator);
+    container.appendChild(wrap);
+    container.scrollTop = container.scrollHeight;
+  }
+
+  function removeTyping() {
+    const el = document.getElementById('typingIndicator');
+    if (el) el.remove();
+  }
+
+  function updateDocPanel(sourceFiles, sourceName, userMessage) {
+    const body = document.getElementById('docPanelBody');
+
+    if (!sourceFiles || sourceFiles.length === 0) {
+      body.innerHTML = `
+        <div class="doc-empty">
+          <div class="icon">📂</div>
+          <p>回答後這裡會顯示<br>引用的資料來源</p>
+        </div>`;
+      return;
+    }
+
+    body.innerHTML = '';
+    sourceFiles.forEach(file => {
+      const excerpt = getExcerpt(file, userMessage || '');
+      const card = document.createElement('div');
+      card.className = 'doc-source-card';
+      card.innerHTML = `
+        <div class="doc-source-header">
+          <span>📄 ${file.name}</span>
+          <small>來源文件</small>
+        </div>
+        <div class="doc-source-excerpt">${excerpt || '（無法顯示預覽）'}</div>
+        ${file.webViewLink ? `<a class="doc-source-link" href="${file.webViewLink}" target="_blank">開啟原始文件 →</a>` : ''}
+      `;
+      body.appendChild(card);
+    });
+  }
+
+  // ═══════════════════════════════════════
+  // SEND MESSAGE
+  // ═══════════════════════════════════════
+  async function sendMessage() {
+    if (isLoading) return;
+
+    const input = document.getElementById('messageInput');
+    const userMessage = input.value.trim();
+    if (!userMessage) return;
+
+    const { apiKey } = loadSettings();
+    if (!apiKey) {
+      openSettings();
+      return;
+    }
+
+    input.value = '';
+    input.style.height = 'auto';
+    isLoading = true;
+    document.getElementById('sendBtn').disabled = true;
+
+    appendMessage('user', userMessage);
+    conversationHistory.push({ role: 'user', content: userMessage });
+
+    showTyping();
+
+    try {
+      const rawResponse = await callAI(userMessage);
+      removeTyping();
+
+      const { answer, source, followups } = parseResponse(rawResponse);
+
+      conversationHistory.push({ role: 'assistant', content: answer });
+
+      appendMessage('bot', answer, source, followups, userMessage);
+
+    } catch (e) {
+      removeTyping();
+      appendMessage('bot', `⚠️ 發生錯誤：${e.message}`, null, [], userMessage);
+    }
+
+    isLoading = false;
+    document.getElementById('sendBtn').disabled = false;
+    input.focus();
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  }
+
+  function autoResize(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+  }
+
+  // ═══════════════════════════════════════
+  // INIT
+  // ═══════════════════════════════════════
+  updateModelOptions();
+
+  const saved = loadSettings();
+  if (saved.apiKey) {
+    const statusEl = document.getElementById('sopStatus');
+    statusEl.textContent = `✓ ${saved.provider === 'gemini' ? 'Gemini' : 'OpenAI'} 已設定`;
+    statusEl.className = 'sop-status loaded';
+  }
+
+  loadSOPs();
+</script>
+</body>
+</html>
