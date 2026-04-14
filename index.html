@@ -535,6 +535,173 @@
     .welcome-message .emoji { font-size: 48px; margin-bottom: 12px; }
     .welcome-message h3 { font-size: 16px; font-weight: 700; color: #1a1a2e; margin-bottom: 8px; }
     .welcome-message p { font-size: 13px; line-height: 1.6; }
+
+    /* ── SOP Guide Modal ── */
+    .guide-modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .guide-modal-overlay.active { display: flex; }
+
+    .guide-modal {
+      background: #fff;
+      border-radius: 16px;
+      width: 680px;
+      max-width: 95vw;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+      overflow: hidden;
+    }
+
+    .guide-modal-header {
+      padding: 20px 24px 16px;
+      border-bottom: 1px solid #e8eaf0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    .guide-modal-header h2 { font-size: 17px; font-weight: 700; }
+    .guide-modal-header p { font-size: 12px; color: #8892a4; margin-top: 2px; }
+
+    .guide-close-btn {
+      background: none;
+      border: none;
+      font-size: 20px;
+      color: #8892a4;
+      cursor: pointer;
+      padding: 4px;
+      line-height: 1;
+    }
+    .guide-close-btn:hover { color: #1a1a2e; }
+
+    .guide-modal-body {
+      overflow-y: auto;
+      padding: 20px 24px;
+      flex: 1;
+    }
+
+    .guide-tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid #e8eaf0;
+      padding-bottom: 0;
+    }
+
+    .guide-tab {
+      padding: 8px 16px;
+      border: none;
+      background: none;
+      font-size: 13.5px;
+      font-weight: 600;
+      color: #8892a4;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      transition: all 0.15s;
+    }
+    .guide-tab.active { color: #4f8ef7; border-bottom-color: #4f8ef7; }
+    .guide-tab:hover:not(.active) { color: #1a1a2e; }
+
+    .guide-tab-content { display: none; }
+    .guide-tab-content.active { display: block; }
+
+    .steps-list { list-style: none; }
+    .steps-list li {
+      display: flex;
+      gap: 14px;
+      padding: 14px 0;
+      border-bottom: 1px solid #f0f2f5;
+    }
+    .steps-list li:last-child { border-bottom: none; }
+
+    .step-num {
+      width: 28px; height: 28px;
+      background: #4f8ef7;
+      color: #fff;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .step-body h4 { font-size: 14px; font-weight: 700; color: #1a1a2e; margin-bottom: 4px; }
+    .step-body p { font-size: 13px; color: #4b5563; line-height: 1.6; }
+    .step-body .step-tag {
+      display: inline-block;
+      margin-top: 6px;
+      padding: 2px 8px;
+      background: #eef2ff;
+      color: #4f46e5;
+      border-radius: 4px;
+      font-size: 11.5px;
+    }
+
+    .prompt-section h4 { font-size: 14px; font-weight: 700; margin-bottom: 8px; color: #1a1a2e; }
+    .prompt-section p { font-size: 13px; color: #6b7280; margin-bottom: 12px; line-height: 1.6; }
+
+    .prompt-box-wrapper { position: relative; }
+
+    .prompt-textarea {
+      width: 100%;
+      height: 300px;
+      padding: 14px;
+      border: 1.5px solid #e5e7eb;
+      border-radius: 10px;
+      font-size: 12.5px;
+      font-family: monospace;
+      color: #374151;
+      background: #f9fafb;
+      resize: none;
+      line-height: 1.6;
+      outline: none;
+    }
+
+    .copy-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      margin-top: 10px;
+      padding: 11px;
+      background: #4f8ef7;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      justify-content: center;
+      transition: background 0.15s;
+    }
+    .copy-btn:hover { background: #3b7de8; }
+    .copy-btn.copied { background: #16a34a; }
+
+    .checklist { list-style: none; }
+    .checklist li {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 7px 0;
+      font-size: 13px;
+      color: #374151;
+      border-bottom: 1px solid #f0f2f5;
+    }
+    .checklist li:last-child { border-bottom: none; }
+    .checklist .check-icon { color: #4f8ef7; font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+    .checklist .check-cat { font-weight: 700; color: #8892a4; font-size: 11px; text-transform: uppercase; margin: 10px 0 4px; display: block; }
   </style>
 </head>
 <body>
@@ -559,6 +726,9 @@
   </div>
 
   <div class="sidebar-footer">
+    <button class="settings-btn" onclick="openSOPGuide()" style="margin-bottom:8px;">
+      📝 新增 SOP 指南
+    </button>
     <button class="settings-btn" onclick="openSettings()">
       ⚙️ API 設定
     </button>
@@ -610,6 +780,164 @@
     </div>
   </div>
 </aside>
+
+<!-- SOP Guide Modal -->
+<div class="guide-modal-overlay" id="sopGuideModal">
+  <div class="guide-modal">
+    <div class="guide-modal-header">
+      <div>
+        <h2>📝 新增 SOP 指南</h2>
+        <p>有新的流程要上傳？跟著步驟做，讓 AI 助理學會新知識</p>
+      </div>
+      <button class="guide-close-btn" onclick="closeSOPGuide()">✕</button>
+    </div>
+
+    <div class="guide-modal-body">
+      <div class="guide-tabs">
+        <button class="guide-tab active" onclick="switchTab('steps')">📋 上傳流程</button>
+        <button class="guide-tab" onclick="switchTab('prompt')">✨ AI 整理 Prompt</button>
+        <button class="guide-tab" onclick="switchTab('checklist')">✅ 上傳前檢查</button>
+      </div>
+
+      <!-- Tab 1: Steps -->
+      <div class="guide-tab-content active" id="tab-steps">
+        <ul class="steps-list">
+          <li>
+            <div class="step-num">1</div>
+            <div class="step-body">
+              <h4>收集原始資料</h4>
+              <p>把手上的資料整理好，不需要先整理格式。</p>
+              <span class="step-tag">Word / LINE 截圖 / 筆記 / 口頭說明打字都可以</span>
+            </div>
+          </li>
+          <li>
+            <div class="step-num">2</div>
+            <div class="step-body">
+              <h4>用 AI 整理成 Markdown 格式</h4>
+              <p>切換到「AI 整理 Prompt」頁，複製 Prompt，貼到 ChatGPT / Claude / Gemini，把原始資料貼在後面送出。</p>
+            </div>
+          </li>
+          <li>
+            <div class="step-num">3</div>
+            <div class="step-body">
+              <h4>自己對照檢查</h4>
+              <p>切換到「上傳前檢查」頁，逐項確認，全部通過才繼續。</p>
+            </div>
+          </li>
+          <li>
+            <div class="step-num">4</div>
+            <div class="step-body">
+              <h4>存成 .md 或 .txt 檔</h4>
+              <p>把 AI 輸出的文字複製，用記事本或任何文字編輯器貼上，儲存為 <code style="background:#f0f2f5;padding:2px 6px;border-radius:4px;font-size:12px;">流程名稱.md</code></p>
+            </div>
+          </li>
+          <li>
+            <div class="step-num">5</div>
+            <div class="step-body">
+              <h4>上傳到 Google Drive</h4>
+              <p>進入「Bankee AI-Bot」資料夾 → 點「＋新增」→「檔案上傳」→ 選擇剛儲存的檔案。</p>
+            </div>
+          </li>
+          <li>
+            <div class="step-num">6</div>
+            <div class="step-body">
+              <h4>重新整理網頁驗證</h4>
+              <p>按 <code style="background:#f0f2f5;padding:2px 6px;border-radius:4px;font-size:12px;">Cmd+R</code>（Mac）或 <code style="background:#f0f2f5;padding:2px 6px;border-radius:4px;font-size:12px;">F5</code>（Windows）重新整理，用口語問一個新 SOP 應該能回答的問題，確認右側顯示剛上傳的文件名稱。</p>
+            </div>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Tab 2: Prompt -->
+      <div class="guide-tab-content" id="tab-prompt">
+        <div class="prompt-section">
+          <h4>RAG 優化 Prompt</h4>
+          <p>複製以下 Prompt，貼到任何 AI 工具，再把你的原始資料貼在最後面。</p>
+          <div class="prompt-box-wrapper">
+            <textarea class="prompt-textarea" id="sopPromptText" readonly>你是一個專為 AI 問答系統優化文件的助手。
+
+我要把這份 SOP 上傳到一個 RAG 系統（AI 會截取文件片段來回答問題）。
+請將以下原始資料整理成「RAG 優化版」的 Markdown 文件，嚴格遵守以下規則：
+
+【結構規則】
+1. 使用標題層級：# 主標題、## 大段落、### 小段落
+2. 每個段落只講一件事，超過 5 行就拆開
+3. 不使用「如上所述」「同前」「參見步驟 X」「詳見上方」等交互引用——每段必須獨立完整
+
+【步驟規則】
+4. 步驟用數字編號，每個步驟包含：
+   - 操作者是誰（例：員工本人、主管、HR）
+   - 在哪個系統或工具操作（每次都寫全名，例：永遠寫「HR 系統（網址：hr.company.com）」，不要只寫「系統」）
+   - 具體動作是什麼（點哪個按鈕、填什麼欄位）
+   - 完成的標誌是什麼（會收到什麼通知、畫面顯示什麼）
+5. 如果有「如果 A 就做 X、如果 B 就做 Y」的條件，每條路徑都要完整寫出，不能只說「依情況而定」
+
+【常見問題規則】
+6. 每份文件必須有「常見問題」區塊，包含至少 8 個問答
+7. 問題要涵蓋以下角度（不能都問同一件事）：
+   - 怎麼開始（入口在哪、第一步做什麼）
+   - 找誰負責（要聯絡誰、誰來審核）
+   - 截止時間（什麼時候要做、期限是什麼）
+   - 出問題怎辦（送出失敗、沒收到通知、找不到入口）
+   - 特殊情況（主管不在、忘記密碼、假別選錯）
+8. 每個問答的答案必須完整獨立：答案裡要包含完整步驟或說明，不能說「同上」或「請見上方步驟」
+9. 同一個問題用 2～3 種說法寫出來（口語版、正式版、新人版），例：
+   - Q：請假要怎麼申請？
+   - Q：我想請假要怎麼辦？
+   - Q：假單在哪裡填？
+   （以上三個問題的答案可以相同）
+
+【語言規則】
+10. 專有名詞第一次出現要加說明（例：ERP（企業資源規劃系統））
+11. 系統名稱、表單名稱、部門名稱在文件中每次出現都要寫全名，不要用「它」「該系統」代替
+12. 不確定的資訊用 [待確認] 標記，不要自行補充或猜測
+
+【文件結尾】
+13. 最後一定要有：
+    - 適用對象（哪些人要照這份做）
+    - 不適用對象（哪些情況不適用這份）
+    - 最後更新日期
+    - 負責人
+
+原始資料：
+---
+[把你的原始資料貼在這裡]
+---
+
+請輸出完整的 Markdown 文件。</textarea>
+          </div>
+          <button class="copy-btn" id="copyBtn" onclick="copyPrompt()">
+            📋 一鍵複製 Prompt
+          </button>
+        </div>
+      </div>
+
+      <!-- Tab 3: Checklist -->
+      <div class="guide-tab-content" id="tab-checklist">
+        <p style="font-size:13px;color:#6b7280;margin-bottom:14px;">AI 整理完後，逐項確認，全部通過才能上傳：</p>
+        <span class="check-cat">內容完整性</span>
+        <ul class="checklist">
+          <li><span class="check-icon">☐</span>每個步驟都有寫：是誰操作、在哪個系統、做什麼動作、完成標誌</li>
+          <li><span class="check-icon">☐</span>有條件分支的地方（如果...就...），每條路都寫完整</li>
+          <li><span class="check-icon">☐</span>系統名稱每次都寫全名，沒有用「它」「該系統」代替</li>
+        </ul>
+        <span class="check-cat">常見問題</span>
+        <ul class="checklist">
+          <li><span class="check-icon">☐</span>有至少 8 個問答</li>
+          <li><span class="check-icon">☐</span>涵蓋「怎麼開始、找誰、截止時間、出錯怎辦」四個角度</li>
+          <li><span class="check-icon">☐</span>每個答案是完整獨立的（不依賴其他段落）</li>
+          <li><span class="check-icon">☐</span>同一個意思有 2～3 種不同問法</li>
+        </ul>
+        <span class="check-cat">格式</span>
+        <ul class="checklist">
+          <li><span class="check-icon">☐</span>沒有「如上所述」「同前」「參見步驟 X」等交互引用</li>
+          <li><span class="check-icon">☐</span>不確定的地方有標記 [待確認]，沒有自己補充</li>
+          <li><span class="check-icon">☐</span>純文字，沒有掃描圖片（圖片 AI 讀不到）</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- Settings Modal -->
 <div class="modal-overlay" id="settingsModal">
@@ -1121,6 +1449,41 @@
     document.getElementById('sendBtn').disabled = false;
     input.focus();
   }
+
+  // ═══════════════════════════════════════
+  // SOP GUIDE MODAL
+  // ═══════════════════════════════════════
+  function openSOPGuide() {
+    document.getElementById('sopGuideModal').classList.add('active');
+  }
+
+  function closeSOPGuide() {
+    document.getElementById('sopGuideModal').classList.remove('active');
+  }
+
+  function switchTab(tab) {
+    document.querySelectorAll('.guide-tab').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.guide-tab-content').forEach(el => el.classList.remove('active'));
+    document.getElementById('tab-' + tab).classList.add('active');
+    event.target.classList.add('active');
+  }
+
+  function copyPrompt() {
+    const text = document.getElementById('sopPromptText').value;
+    navigator.clipboard.writeText(text).then(() => {
+      const btn = document.getElementById('copyBtn');
+      btn.textContent = '✅ 已複製！貼到 AI 工具後，把原始資料貼在最後面';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.innerHTML = '📋 一鍵複製 Prompt';
+        btn.classList.remove('copied');
+      }, 3000);
+    });
+  }
+
+  document.getElementById('sopGuideModal').addEventListener('click', function(e) {
+    if (e.target === this) closeSOPGuide();
+  });
 
   function handleKeyDown(e) {
     if (e.key === 'Enter' && !e.shiftKey) {
