@@ -311,6 +311,48 @@
       30% { transform: translateY(-5px); }
     }
 
+    /* Context bar */
+    .context-bar {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      background: #eef2ff;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      font-size: 12px;
+      color: #4f46e5;
+    }
+    .context-bar.visible { display: flex; }
+    .context-bar-clear {
+      margin-left: auto;
+      background: none;
+      border: none;
+      font-size: 12px;
+      color: #9ca3af;
+      cursor: pointer;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .context-bar-clear:hover { background: #e0e7ff; color: #4f46e5; }
+
+    /* Followup button */
+    .followup-ask-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      margin-top: 6px;
+      padding: 5px 11px;
+      background: none;
+      border: 1px solid #e5e7eb;
+      border-radius: 20px;
+      font-size: 12px;
+      color: #6b7280;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .followup-ask-btn:hover { background: #eef2ff; border-color: #4f8ef7; color: #4f8ef7; }
+
     /* Chat input */
     .chat-input-area {
       padding: 16px 20px;
@@ -905,6 +947,11 @@
   </div>
 
   <div class="chat-input-area">
+    <div class="context-bar" id="contextBar">
+      <span>💬</span>
+      <span id="contextBarText">對話進行中，AI 記得你之前問的問題</span>
+      <button class="context-bar-clear" onclick="clearConversation()" title="清除對話，重新開始">✕ 清除</button>
+    </div>
     <div class="chat-input-wrapper">
       <textarea
         id="messageInput"
@@ -1476,6 +1523,18 @@ C. 判斷哪些內容是「固定流程」（需要記錄），哪些是「隨�
     }
   }
 
+  function updateContextBar() {
+    const bar = document.getElementById('contextBar');
+    const text = document.getElementById('contextBarText');
+    const turns = Math.floor(conversationHistory.length / 2);
+    if (turns > 0) {
+      text.textContent = `對話進行中（${turns} 則）— AI 記得你之前的問題，可直接追問`;
+      bar.classList.add('visible');
+    } else {
+      bar.classList.remove('visible');
+    }
+  }
+
   function clearConversation() {
     conversationHistory = [];
     const chatMessages = document.getElementById('chatMessages');
@@ -1485,7 +1544,12 @@ C. 判斷哪些內容是「固定流程」（需要記錄），哪些是「隨�
         <h3>有什麼工作上的問題嗎？</h3>
         <p>我會根據部門的 SOP 文件來回答<br>點左側快捷按鈕或直接輸入問題</p>
       </div>`;
-    document.getElementById('docPanel').innerHTML = '<p style="color:#adb5bd;font-size:13px;text-align:center;margin-top:40px;">回答後這裡會顯示<br>引用的資料來源</p>';
+    document.getElementById('docPanelBody').innerHTML = `
+      <div class="doc-empty">
+        <div class="icon">📂</div>
+        <p>回答後這裡會顯示<br>引用的資料來源</p>
+      </div>`;
+    updateContextBar();
   }
 
   function buildContext() {
@@ -1670,7 +1734,7 @@ C. 判斷哪些內容是「固定流程」（需要記錄），哪些是「隨�
         updateDocPanel(null, null, null);
       }
 
-      // Follow-up chips
+      // Follow-up chips (AI suggested questions)
       if (followups && followups.length > 0) {
         const chipsDiv = document.createElement('div');
         chipsDiv.className = 'followup-chips';
@@ -1686,6 +1750,17 @@ C. 判斷哪些內容是「固定流程」（需要記錄），哪些是「隨�
         });
         contentDiv.appendChild(chipsDiv);
       }
+
+      // Followup ask button
+      const askBtn = document.createElement('button');
+      askBtn.className = 'followup-ask-btn';
+      askBtn.innerHTML = '💬 這裡有不懂的，繼續追問';
+      askBtn.onclick = () => {
+        const input = document.getElementById('messageInput');
+        input.focus();
+        input.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      };
+      contentDiv.appendChild(askBtn);
     }
 
     wrap.appendChild(avatar);
@@ -1799,6 +1874,7 @@ C. 判斷哪些內容是「固定流程」（需要記錄），哪些是「隨�
       conversationHistory.push({ role: 'assistant', content: answer });
 
       appendMessage('bot', answer, source, followups, userMessage);
+      updateContextBar();
 
     } catch (e) {
       removeTyping();
