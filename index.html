@@ -339,25 +339,26 @@
       flex: 1;
       border: none;
       background: transparent;
-      font-size: 14px;
+      font-size: 15px;
       color: #1a1a2e;
       outline: none;
       resize: none;
-      min-height: 20px;
+      min-height: 24px;
       max-height: 120px;
-      line-height: 1.5;
+      line-height: 1.6;
       font-family: inherit;
+      padding: 2px 0;
     }
 
     #messageInput::placeholder { color: #aab0bc; }
 
     .send-btn {
-      width: 36px; height: 36px;
+      width: 38px; height: 38px;
       background: #4f8ef7;
       border: none;
       border-radius: 10px;
       color: #fff;
-      font-size: 16px;
+      font-size: 17px;
       cursor: pointer;
       display: flex; align-items: center; justify-content: center;
       flex-shrink: 0;
@@ -1742,6 +1743,7 @@ C. 判斷哪些內容是「固定流程」（需要記錄），哪些是「隨�
 
     input.value = '';
     input.style.height = 'auto';
+    setTimeout(() => { input.value = ''; input.style.height = 'auto'; }, 0);
     isLoading = true;
     document.getElementById('sendBtn').disabled = true;
 
@@ -1806,7 +1808,7 @@ C. 判斷哪些內容是「固定流程」（需要記錄），哪些是「隨�
   });
 
   function handleKeyDown(e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
       e.preventDefault();
       sendMessage();
     }
