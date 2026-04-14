@@ -149,6 +149,8 @@
 
     .chat-header h2 { font-size: 16px; font-weight: 700; color: #1a1a2e; }
     .chat-header p { font-size: 12px; color: #8892a4; margin-top: 2px; }
+    #clearBtn { font-size: 12px; color: #8892a4; background: none; border: 1px solid #e8eaf0; border-radius: 6px; padding: 5px 10px; cursor: pointer; white-space: nowrap; }
+    #clearBtn:hover { background: #f5f7fb; color: #e74c3c; border-color: #e74c3c; }
 
     .chat-messages {
       flex: 1;
@@ -571,6 +573,7 @@
       <h2>Chat & Guides</h2>
       <p>根據部門 SOP 文件回答工作問題</p>
     </div>
+    <button id="clearBtn" onclick="clearConversation()" title="清除對話">🗑 清除對話</button>
   </div>
 
   <div class="chat-messages" id="chatMessages">
@@ -803,6 +806,18 @@
       statusEl.className = 'sop-status error';
       quickBtns.innerHTML = `<div style="font-size:11px;color:#f87171;padding:8px 4px;">載入失敗：${e.message}</div>`;
     }
+  }
+
+  function clearConversation() {
+    conversationHistory = [];
+    const chatMessages = document.getElementById('chatMessages');
+    chatMessages.innerHTML = `
+      <div class="welcome-message">
+        <div class="emoji">💬</div>
+        <h3>有什麼工作上的問題嗎？</h3>
+        <p>我會根據部門的 SOP 文件來回答<br>點左側快捷按鈕或直接輸入問題</p>
+      </div>`;
+    document.getElementById('docPanel').innerHTML = '<p style="color:#adb5bd;font-size:13px;text-align:center;margin-top:40px;">回答後這裡會顯示<br>引用的資料來源</p>';
   }
 
   function buildContext() {
