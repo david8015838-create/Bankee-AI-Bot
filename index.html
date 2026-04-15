@@ -1605,6 +1605,29 @@ D. 處理圖片與截圖
     console.warn('marked renderer setup failed:', e);
   }
 
+  // Convert Google Doc HTML export to plain text, preserving hyperlink URLs
+  function googleDocHtmlToText(html) {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    // Unwrap Google's redirect URLs: https://www.google.com/url?q=REAL_URL&...
+    doc.querySelectorAll('a[href]').forEach(a => {
+      let href = a.getAttribute('href') || '';
+      // Strip Google redirect wrapper
+      try {
+        const u = new URL(href);
+        if ((u.hostname === 'www.google.com' || u.hostname === 'google.com') && u.pathname === '/url') {
+          href = u.searchParams.get('q') || href;
+        }
+      } catch(e) {}
+      const text = a.textContent.trim();
+      if (href.startsWith('http') && href !== text) {
+        a.textContent = text + '（' + href + '）';
+      } else if (href.startsWith('http')) {
+        a.textContent = href;
+      }
+    });
+    return (doc.body ? doc.body.innerText || doc.body.textContent : doc.documentElement.textContent).trim();
+  }
+
   const SYSTEM_PROMPT = `你是部門的工作助理，除了回答 SOP 問題，也可以回答使用者個人工具中的內容（待辦清單、行事曆、筆記、通訊錄、常用連結）。
 回答一律使用繁體中文。
 
@@ -1915,10 +1938,12 @@ D. 處理圖片與截圖
         try {
           let content = '';
           if (file.mimeType === 'application/vnd.google-apps.document') {
+            // Export as HTML to preserve hyperlinks (plain text strips URLs)
             const res = await fetch(
-              `https://www.googleapis.com/drive/v3/files/${file.id}/export?mimeType=text%2Fplain&key=${DRIVE_API_KEY}`
+              `https://www.googleapis.com/drive/v3/files/${file.id}/export?mimeType=text%2Fhtml&key=${DRIVE_API_KEY}`
             );
-            content = await res.text();
+            const html = await res.text();
+            content = googleDocHtmlToText(html);
           } else {
             const res = await fetch(
               `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media&key=${DRIVE_API_KEY}`
