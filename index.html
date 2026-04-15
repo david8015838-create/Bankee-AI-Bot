@@ -1933,43 +1933,42 @@ D. 處理圖片與截圖
         return;
       }
 
-      // Load all files in parallel for speed
-      const results = await Promise.all(files.map(async (file) => {
-        try {
-          let content = '';
-          if (file.mimeType === 'application/vnd.google-apps.document') {
-            const res = await fetch(
-              `https://www.googleapis.com/drive/v3/files/${file.id}/export?mimeType=text%2Fhtml&key=${DRIVE_API_KEY}`
-            );
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const html = await res.text();
-            content = googleDocHtmlToText(html);
-          } else {
-            const res = await fetch(
-              `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media&key=${DRIVE_API_KEY}`
-            );
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            content = await res.text();
+      // Load files one by one (parallel triggers Google CORS block)
+      sopFiles = [];
+      for (const file of files) {
+        for (let retry = 0; retry < 2; retry++) {
+          try {
+            let content = '';
+            if (file.mimeType === 'application/vnd.google-apps.document') {
+              const res = await fetch(
+                `https://www.googleapis.com/drive/v3/files/${file.id}/export?mimeType=text%2Fhtml&key=${DRIVE_API_KEY}`
+              );
+              if (!res.ok) throw new Error(`HTTP ${res.status}`);
+              const html = await res.text();
+              content = googleDocHtmlToText(html);
+            } else {
+              const res = await fetch(
+                `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media&key=${DRIVE_API_KEY}`
+              );
+              if (!res.ok) throw new Error(`HTTP ${res.status}`);
+              content = await res.text();
+            }
+            const cleanName = file.name.replace(/\.[^.]+$/, '');
+            console.log(`✅ ${cleanName} (${content.length} 字)`);
+            const urls = content.match(/https?:\/\/[^\s)）\]]+/g);
+            if (urls) console.log(`   🔗 ${urls.length} 個 URL:`, urls);
+            sopFiles.push({ ...file, name: cleanName, originalName: file.name, content });
+            break; // success, no retry
+          } catch (e) {
+            if (retry === 0) {
+              console.warn(`⚠ ${file.name} 第一次失敗，1 秒後重試...`, e.message);
+              await new Promise(r => setTimeout(r, 1000));
+            } else {
+              console.warn(`❌ 無法載入 ${file.name}:`, e.message);
+            }
           }
-          // Detect if Google returned a CAPTCHA/error page instead of real content
-          if (content.startsWith('<html>') || content.startsWith('<!DOCTYPE')) {
-            console.warn(`⚠ 文件 ${file.name} 返回 HTML 而非文字，可能被 Google 限流`);
-            return null;
-          }
-          const cleanName = file.name.replace(/\.[^.]+$/, '');
-          console.log(`✅ ${cleanName} (${content.length} 字, mimeType: ${file.mimeType})`);
-          console.log(`   前 200 字: ${content.substring(0, 200)}`);
-          // Log if file has any URLs
-          const urls = content.match(/https?:\/\/[^\s)）\]]+/g);
-          if (urls) console.log(`   🔗 找到 ${urls.length} 個 URL:`, urls);
-          else console.log(`   ⚠ 此文件中沒有找到任何 URL`);
-          return { ...file, name: cleanName, originalName: file.name, content };
-        } catch (e) {
-          console.warn(`無法載入文件 ${file.name}:`, e);
-          return null;
         }
-      }));
-      sopFiles = results.filter(f => f !== null);
+      }
 
       // All files active by default
       activeFileIds = new Set(sopFiles.map(f => f.id));
