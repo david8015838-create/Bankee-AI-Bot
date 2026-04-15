@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>部門 SOP 助理</title>
   <script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
+  <script src="https://accounts.google.com/gsi/client" async></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1284,6 +1285,19 @@ D. 處理圖片與截圖
           支援多組 Key 輪流使用，額度耗盡時自動切換下一組。<br>
           免費版每組 Key 每天約 1500 次、每分鐘 15 次。
         </p>
+
+        <hr style="border:none;border-top:1px solid #f0f2f5;margin:16px 0;">
+        <div class="form-group">
+          <label style="display:flex;align-items:center;gap:6px;">
+            Google OAuth Client ID
+            <span style="font-size:10px;color:#9ca3af;font-weight:400;">（用於在網站內直接編輯 SOP 文件）</span>
+          </label>
+          <input type="text" id="oauthClientIdInput" placeholder="貼上 OAuth 2.0 Client ID（結尾是 .apps.googleusercontent.com）" autocomplete="off" style="font-size:12px;" />
+          <p style="font-size:11px;color:#9ca3af;margin-top:4px;">
+            設定步驟：Google Cloud Console → APIs &amp; Services → Credentials → 建立 OAuth 2.0 用戶端 ID（類型選「網路應用程式」）→ 將 <code style="background:#f0f2f5;padding:1px 4px;border-radius:3px;">https://david8015838-create.github.io</code> 加入「已授權的 JavaScript 來源」
+          </p>
+          <button class="btn-primary" style="width:100%;margin-top:6px;" onclick="saveOAuthClientId()">儲存 Client ID</button>
+        </div>
       </div>
 
       <!-- Tab: Model -->
@@ -1356,12 +1370,44 @@ D. 處理圖片與截圖
     <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 20px 14px;border-bottom:1px solid #f0f2f5;flex-shrink:0;">
       <div>
         <h2 style="font-size:16px;font-weight:700;color:#1a1a2e;">📁 SOP 文件庫</h2>
-        <p style="font-size:12px;color:#9ca3af;margin-top:2px;">點擊文件名稱在 Google Drive 中開啟</p>
+        <p style="font-size:12px;color:#9ca3af;margin-top:2px;">點文件名稱在 Drive 開啟，或點「編輯」在網站內直接修改</p>
       </div>
       <button onclick="closeFilesPicker()" style="background:none;border:none;font-size:18px;color:#9ca3af;cursor:pointer;padding:4px 8px;border-radius:6px;">✕</button>
     </div>
     <div style="overflow-y:auto;padding:10px 12px;" id="filesPickerList">
       <p style="font-size:13px;color:#9ca3af;padding:16px 0;text-align:center;">載入中...</p>
+    </div>
+  </div>
+</div>
+
+<!-- SOP Editor Modal -->
+<div class="personal-modal-overlay" id="sopEditorModal" onclick="if(event.target===this)closeSopEditor()">
+  <div style="background:#fff;border-radius:14px;width:880px;max-width:96vw;height:88vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.25);overflow:hidden;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #f0f2f5;flex-shrink:0;">
+      <div>
+        <h2 style="font-size:16px;font-weight:700;color:#1a1a2e;">✏️ 編輯 SOP 文件</h2>
+        <p style="font-size:12px;color:#9ca3af;margin-top:2px;" id="sopEditorFileName">—</p>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span id="sopEditorStatus" style="font-size:12px;"></span>
+        <button onclick="closeSopEditor()" style="background:none;border:none;font-size:18px;color:#9ca3af;cursor:pointer;padding:4px 8px;border-radius:6px;">✕</button>
+      </div>
+    </div>
+    <textarea id="sopEditorTextarea"
+              style="flex:1;width:100%;padding:20px 24px;border:none;resize:none;font-family:'SF Mono','Fira Code','Menlo',monospace;font-size:13px;line-height:1.75;color:#1a1a2e;outline:none;overflow-y:auto;background:#fafafa;"
+              placeholder="載入中..."></textarea>
+    <div style="padding:14px 20px;border-top:1px solid #f0f2f5;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+      <p style="font-size:11px;color:#9ca3af;">儲存後重新整理頁面，AI 即可讀取更新內容</p>
+      <div style="display:flex;gap:8px;">
+        <button onclick="closeSopEditor()"
+                style="padding:8px 16px;border:1px solid #e0e0e0;border-radius:8px;background:#fff;color:#6b7280;font-size:13px;cursor:pointer;">
+          取消
+        </button>
+        <button onclick="saveSopEditor()" id="sopEditorSaveBtn"
+                style="padding:8px 20px;border:none;border-radius:8px;background:linear-gradient(135deg,#4f8ef7,#7c5cfc);color:#fff;font-size:13px;font-weight:600;cursor:pointer;">
+          ☁️ 儲存到 Google Drive
+        </button>
+      </div>
     </div>
   </div>
 </div>
@@ -1662,11 +1708,119 @@ D. 處理圖片與截圖
     }
   }
 
+  function getOAuthClientId() { return localStorage.getItem('oauth_client_id') || ''; }
+  function saveOAuthClientId() {
+    const val = document.getElementById('oauthClientIdInput').value.trim();
+    if (!val) { alert('請填入 Client ID'); return; }
+    localStorage.setItem('oauth_client_id', val);
+    alert('✓ 已儲存 OAuth Client ID');
+  }
+
+  // ── Google Drive OAuth + Editor ──
+  let gDriveToken = null;
+  let gTokenExpiry = 0;
+  let gTokenClient = null;
+  let currentEditFile = null;
+
+  function initGisClient() {
+    const clientId = getOAuthClientId();
+    if (!clientId) throw new Error('請先在設定（⚙️）→ API Keys → 填入 Google OAuth Client ID');
+    if (!window.google?.accounts?.oauth2) throw new Error('Google 身份驗證程式庫尚未載入，請稍後再試');
+    if (gTokenClient) return; // already initialized
+    gTokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope: 'https://www.googleapis.com/auth/drive',
+      callback: () => {}
+    });
+  }
+
+  function requestGoogleAuth() {
+    return new Promise((resolve, reject) => {
+      try { initGisClient(); } catch(e) { reject(e); return; }
+      if (gDriveToken && Date.now() < gTokenExpiry - 60000) { resolve(gDriveToken); return; }
+      gTokenClient.callback = (resp) => {
+        if (resp.error) { reject(new Error(resp.error_description || resp.error)); return; }
+        gDriveToken = resp.access_token;
+        gTokenExpiry = Date.now() + (resp.expires_in || 3600) * 1000;
+        resolve(gDriveToken);
+      };
+      gTokenClient.requestAccessToken({ prompt: gDriveToken ? '' : 'consent' });
+    });
+  }
+
+  function openSopEditor(idx) {
+    const file = sopFiles[idx];
+    if (!file) return;
+    currentEditFile = file;
+    closeFilesPicker();
+    document.getElementById('sopEditorFileName').textContent = file.name;
+    document.getElementById('sopEditorTextarea').value = file.content || '';
+    document.getElementById('sopEditorStatus').textContent = '';
+    document.getElementById('sopEditorSaveBtn').disabled = false;
+    document.getElementById('sopEditorModal').classList.add('active');
+  }
+
+  function closeSopEditor() {
+    document.getElementById('sopEditorModal').classList.remove('active');
+    currentEditFile = null;
+  }
+
+  async function saveSopEditor() {
+    if (!currentEditFile) return;
+    const content = document.getElementById('sopEditorTextarea').value;
+    const statusEl = document.getElementById('sopEditorStatus');
+    const saveBtn = document.getElementById('sopEditorSaveBtn');
+
+    statusEl.textContent = '驗證中...';
+    statusEl.style.color = '#9ca3af';
+    saveBtn.disabled = true;
+
+    try {
+      const token = await requestGoogleAuth();
+      statusEl.textContent = '儲存中...';
+
+      const resp = await fetch(
+        `https://www.googleapis.com/upload/drive/v3/files/${currentEditFile.id}?uploadType=media`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'text/plain; charset=utf-8'
+          },
+          body: content
+        }
+      );
+
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err?.error?.message || `HTTP ${resp.status}`);
+      }
+
+      // Update in-memory cache so AI reads new content without page refresh
+      currentEditFile.content = content;
+      const cached = sopFiles.find(f => f.id === currentEditFile.id);
+      if (cached) cached.content = content;
+
+      statusEl.textContent = '✓ 已儲存到 Google Drive';
+      statusEl.style.color = '#22c55e';
+      setTimeout(() => { if (statusEl.textContent.startsWith('✓')) statusEl.textContent = ''; }, 4000);
+    } catch(e) {
+      statusEl.textContent = `❌ ${e.message}`;
+      statusEl.style.color = '#ef4444';
+      if (e.message.includes('Client ID')) {
+        alert(e.message + '\n\n請到右下角 ⚙️ 設定 → API Keys → 填入 Google OAuth Client ID。');
+      }
+    } finally {
+      saveBtn.disabled = false;
+    }
+  }
+
   function openSettings() {
     const s = loadSettings();
     updateModelOptions();
     document.getElementById('providerSelect').value = s.provider;
     document.getElementById('modelSelect').value = s.model;
+    document.getElementById('oauthClientIdInput').value = getOAuthClientId();
     switchSettingsTab('keys');
     renderKeyList();
     document.getElementById('settingsModal').classList.add('active');
@@ -1738,13 +1892,19 @@ D. 處理圖片與截圖
       if (sopFiles.length === 0) {
         pickerList.innerHTML = '<p style="font-size:13px;color:#9ca3af;padding:16px 0;text-align:center;">資料夾目前沒有文件</p>';
       } else {
-        pickerList.innerHTML = sopFiles.map(f => `
-          <a href="${f.webViewLink || '#'}" target="_blank"
-             style="display:flex;align-items:center;gap:10px;padding:11px 10px;border-radius:8px;text-decoration:none;color:#1a1a2e;transition:background 0.12s;"
-             onmouseover="this.style.background='#f0f4ff'" onmouseout="this.style.background='transparent'">
-            <span style="font-size:18px;flex-shrink:0;">📄</span>
-            <span style="font-size:13.5px;font-weight:500;">${escapeHtml(f.name)}</span>
-          </a>
+        pickerList.innerHTML = sopFiles.map((f, idx) => `
+          <div style="display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:8px;transition:background 0.12s;"
+               onmouseover="this.style.background='#f0f4ff'" onmouseout="this.style.background='transparent'">
+            <a href="${f.webViewLink || '#'}" target="_blank"
+               style="display:flex;align-items:center;gap:10px;flex:1;padding:7px 4px;text-decoration:none;color:#1a1a2e;">
+              <span style="font-size:18px;flex-shrink:0;">📄</span>
+              <span style="font-size:13.5px;font-weight:500;">${escapeHtml(f.name)}</span>
+            </a>
+            <button onclick="openSopEditor(${idx})"
+                    style="flex-shrink:0;padding:5px 11px;border:1px solid #d1d5db;border-radius:6px;background:#fff;color:#4f8ef7;font-size:12px;font-weight:500;cursor:pointer;transition:all 0.12s;white-space:nowrap;"
+                    onmouseover="this.style.background='#4f8ef7';this.style.color='#fff';this.style.borderColor='#4f8ef7'"
+                    onmouseout="this.style.background='#fff';this.style.color='#4f8ef7';this.style.borderColor='#d1d5db'">✏️ 編輯</button>
+          </div>
         `).join('');
       }
 
