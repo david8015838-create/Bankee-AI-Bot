@@ -1589,6 +1589,7 @@ D. 處理圖片與截圖
   // STATE
   // ═══════════════════════════════════════
   let sopFiles = [];
+  let activeFileIds = new Set(); // which files AI uses; empty = all
   let conversationHistory = [];
   let isLoading = false;
   let currentKeyIndex = 0;
@@ -1847,7 +1848,7 @@ D. 處理圖片與截圖
       statusEl.className = 'sop-status';
 
       const listRes = await fetch(
-        `https://www.googleapis.com/drive/v3/files?q=%27${FOLDER_ID}%27+in+parents+and+trashed=false&fields=files(id,name,mimeType,webViewLink)&key=${DRIVE_API_KEY}`
+        `https://www.googleapis.com/drive/v3/files?q=%27${FOLDER_ID}%27+in+parents+and+trashed=false&fields=files(id,name,mimeType,webViewLink,owners,lastModifyingUser)&key=${DRIVE_API_KEY}`
       );
 
       if (!listRes.ok) {
@@ -1881,35 +1882,17 @@ D. 處理圖片與截圖
             content = await res.text();
           }
           const cleanName = file.name.replace(/\.[^.]+$/, '');
-          sopFiles.push({ ...file, name: cleanName, originalName: file.name, content });
+          const ownerName = file.owners?.[0]?.displayName || file.lastModifyingUser?.displayName || '未知';
+          sopFiles.push({ ...file, name: cleanName, originalName: file.name, content, ownerName });
         } catch (e) {
           console.warn(`無法載入文件 ${file.name}:`, e);
         }
       }
 
-      // Update files picker modal list
-      const pickerList = document.getElementById('filesPickerList');
-      if (sopFiles.length === 0) {
-        pickerList.innerHTML = '<p style="font-size:13px;color:#9ca3af;padding:16px 0;text-align:center;">資料夾目前沒有文件</p>';
-      } else {
-        pickerList.innerHTML = sopFiles.map((f, idx) => `
-          <div style="display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:8px;transition:background 0.12s;"
-               onmouseover="this.style.background='#f0f4ff'" onmouseout="this.style.background='transparent'">
-            <a href="${f.webViewLink || '#'}" target="_blank"
-               style="display:flex;align-items:center;gap:10px;flex:1;padding:7px 4px;text-decoration:none;color:#1a1a2e;">
-              <span style="font-size:18px;flex-shrink:0;">📄</span>
-              <span style="font-size:13.5px;font-weight:500;">${escapeHtml(f.name)}</span>
-            </a>
-            <button onclick="openSopEditor(${idx})"
-                    style="flex-shrink:0;padding:5px 11px;border:1px solid #d1d5db;border-radius:6px;background:#fff;color:#4f8ef7;font-size:12px;font-weight:500;cursor:pointer;transition:all 0.12s;white-space:nowrap;"
-                    onmouseover="this.style.background='#4f8ef7';this.style.color='#fff';this.style.borderColor='#4f8ef7'"
-                    onmouseout="this.style.background='#fff';this.style.color='#4f8ef7';this.style.borderColor='#d1d5db'">✏️ 編輯</button>
-          </div>
-        `).join('');
-      }
-
-      statusEl.textContent = `✓ 已載入 ${sopFiles.length} 份文件`;
-      statusEl.className = 'sop-status loaded';
+      // All files active by default
+      activeFileIds = new Set(sopFiles.map(f => f.id));
+      renderFilesPickerList();
+      updateActiveStatus();
 
     } catch (e) {
       console.error(e);
@@ -1996,9 +1979,10 @@ D. 處理圖片與截圖
   }
 
   function buildContext() {
-    const sopContext = sopFiles.length === 0
-      ? '（目前沒有可參考的 SOP 文件）'
-      : sopFiles.map(f => `=== 文件：${f.name} ===\n${f.content}`).join('\n\n---\n\n');
+    const active = sopFiles.filter(f => activeFileIds.has(f.id));
+    const sopContext = active.length === 0
+      ? '（目前沒有選取任何 SOP 文件）'
+      : active.map(f => `=== 文件：${f.name} ===\n${f.content}`).join('\n\n---\n\n');
 
     const personalContext = buildPersonalContext();
     if (!personalContext) return sopContext;
@@ -2415,6 +2399,81 @@ D. 處理圖片與截圖
 
   function openFilesPicker() { document.getElementById('filesPickerModal').classList.add('active'); }
   function closeFilesPicker() { document.getElementById('filesPickerModal').classList.remove('active'); }
+
+  function toggleFileActive(fileId) {
+    if (activeFileIds.has(fileId)) {
+      activeFileIds.delete(fileId);
+    } else {
+      activeFileIds.add(fileId);
+    }
+    updateActiveStatus();
+    renderFilesPickerList();
+  }
+
+  function toggleAllFiles(selectAll) {
+    if (selectAll) {
+      activeFileIds = new Set(sopFiles.map(f => f.id));
+    } else {
+      activeFileIds.clear();
+    }
+    updateActiveStatus();
+    renderFilesPickerList();
+  }
+
+  function updateActiveStatus() {
+    const statusEl = document.getElementById('sopStatus');
+    const total = sopFiles.length;
+    const active = activeFileIds.size;
+    if (total === 0) {
+      statusEl.textContent = '未設定 API Key';
+      statusEl.className = 'sop-status';
+      return;
+    }
+    if (active === total) {
+      statusEl.textContent = `✓ 已載入 ${total} 份文件`;
+    } else if (active === 0) {
+      statusEl.textContent = `⚠ 未選取任何文件（共 ${total} 份）`;
+    } else {
+      statusEl.textContent = `✓ 使用 ${active}／${total} 份文件`;
+    }
+    statusEl.className = active > 0 ? 'sop-status loaded' : 'sop-status error';
+  }
+
+  function renderFilesPickerList() {
+    const pickerList = document.getElementById('filesPickerList');
+    if (sopFiles.length === 0) {
+      pickerList.innerHTML = '<p style="font-size:13px;color:#9ca3af;padding:16px 0;text-align:center;">資料夾目前沒有文件</p>';
+      return;
+    }
+    const allSelected = activeFileIds.size === sopFiles.length;
+    pickerList.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px 10px;border-bottom:1px solid #f0f2f5;margin-bottom:4px;">
+        <span style="font-size:11px;color:#9ca3af;">勾選後 AI 只根據選取的文件回答</span>
+        <button onclick="toggleAllFiles(${!allSelected})"
+                style="font-size:11px;color:#4f8ef7;background:none;border:none;cursor:pointer;font-weight:500;padding:2px 6px;">
+          ${allSelected ? '取消全選' : '全選'}
+        </button>
+      </div>
+      ${sopFiles.map((f, idx) => {
+        const checked = activeFileIds.has(f.id);
+        return `
+        <div style="display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:8px;transition:background 0.12s;${!checked ? 'opacity:0.45;' : ''}"
+             onmouseover="this.style.background='#f0f4ff'" onmouseout="this.style.background='transparent'">
+          <input type="checkbox" ${checked ? 'checked' : ''} onchange="toggleFileActive('${f.id}')"
+                 style="width:15px;height:15px;flex-shrink:0;cursor:pointer;accent-color:#4f8ef7;" />
+          <a href="${f.webViewLink || '#'}" target="_blank"
+             style="display:flex;flex-direction:column;flex:1;padding:4px 2px;text-decoration:none;color:#1a1a2e;min-width:0;">
+            <span style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(f.name)}</span>
+            <span style="font-size:10.5px;color:#9ca3af;margin-top:1px;">上傳者：${escapeHtml(f.ownerName || '—')}</span>
+          </a>
+          <button onclick="openSopEditor(${idx})"
+                  style="flex-shrink:0;padding:4px 10px;border:1px solid #d1d5db;border-radius:6px;background:#fff;color:#4f8ef7;font-size:11.5px;font-weight:500;cursor:pointer;white-space:nowrap;"
+                  onmouseover="this.style.background='#4f8ef7';this.style.color='#fff';this.style.borderColor='#4f8ef7'"
+                  onmouseout="this.style.background='#fff';this.style.color='#4f8ef7';this.style.borderColor='#d1d5db'">✏️ 編輯</button>
+        </div>`;
+      }).join('')}
+    `;
+  }
 
   function escapeHtml(str) {
     return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
