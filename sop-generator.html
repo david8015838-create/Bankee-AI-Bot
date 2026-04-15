@@ -1,0 +1,1592 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SOP 文件生成器</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+  background: #f5f7fa;
+  color: #2d3748;
+  min-height: 100vh;
+}
+
+/* ── Header ── */
+.app-header {
+  background: #fff;
+  border-bottom: 1px solid #e8ecf0;
+  padding: 0 24px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+.app-header h1 { font-size: 17px; font-weight: 600; color: #2d3748; }
+.header-actions { display: flex; gap: 8px; align-items: center; }
+.back-link {
+  font-size: 13px; color: #6b7280; text-decoration: none; padding: 6px 12px;
+  border: 1px solid #e5e7eb; border-radius: 6px; transition: all 0.15s;
+}
+.back-link:hover { background: #f3f4f6; color: #374151; }
+.icon-btn {
+  width: 36px; height: 36px; border-radius: 8px; border: 1px solid #e5e7eb;
+  background: #fff; cursor: pointer; display: flex; align-items: center;
+  justify-content: center; font-size: 16px; transition: all 0.15s; color: #6b7280;
+}
+.icon-btn:hover { background: #f3f4f6; border-color: #d1d5db; }
+
+/* ── Main wrapper ── */
+.main {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 32px 20px 80px;
+}
+
+/* ── Type Select ── */
+.type-select-page { text-align: center; padding: 40px 0 20px; }
+.type-select-page h2 { font-size: 22px; font-weight: 700; margin-bottom: 8px; color: #1a202c; }
+.type-select-page p { color: #6b7280; font-size: 14px; margin-bottom: 36px; }
+.type-cards { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; }
+.type-card {
+  background: #fff;
+  border: 2px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 32px 28px;
+  width: 280px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+}
+.type-card:hover { border-color: #4f8ef7; box-shadow: 0 4px 20px rgba(79,142,247,0.15); transform: translateY(-2px); }
+.type-card .icon { font-size: 36px; margin-bottom: 12px; }
+.type-card h3 { font-size: 18px; font-weight: 700; margin-bottom: 8px; color: #1a202c; }
+.type-card p { font-size: 13px; color: #6b7280; line-height: 1.6; }
+.type-card .tag {
+  display: inline-block; margin-top: 14px; font-size: 11px; padding: 3px 8px;
+  background: #eff6ff; color: #3b82f6; border-radius: 20px; font-weight: 500;
+}
+
+/* ── Progress bar ── */
+.progress-wrap { margin-bottom: 28px; }
+.progress-steps { display: flex; align-items: center; overflow-x: auto; padding: 4px 0; }
+.progress-step {
+  display: flex; align-items: center; flex-shrink: 0; cursor: default;
+}
+.step-dot {
+  width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center;
+  justify-content: center; font-size: 12px; font-weight: 600; flex-shrink: 0;
+  background: #e5e7eb; color: #9ca3af; transition: all 0.2s;
+}
+.step-dot.active { background: #4f8ef7; color: #fff; box-shadow: 0 0 0 4px rgba(79,142,247,0.2); }
+.step-dot.done { background: #22c55e; color: #fff; }
+.step-label { font-size: 11px; color: #9ca3af; margin: 0 6px; white-space: nowrap; transition: all 0.2s; }
+.step-label.active { color: #4f8ef7; font-weight: 600; }
+.step-label.done { color: #22c55e; }
+.step-connector { width: 24px; height: 2px; background: #e5e7eb; flex-shrink: 0; transition: all 0.2s; }
+.step-connector.done { background: #22c55e; }
+
+/* ── Card ── */
+.card {
+  background: #fff;
+  border-radius: 16px;
+  border: 1px solid #e8ecf0;
+  padding: 32px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+.card-title { font-size: 19px; font-weight: 700; margin-bottom: 4px; color: #1a202c; }
+.card-subtitle { font-size: 13px; color: #6b7280; margin-bottom: 24px; }
+
+/* ── Form elements ── */
+.form-group { margin-bottom: 20px; }
+.form-label {
+  display: block; font-size: 13px; font-weight: 600; color: #374151;
+  margin-bottom: 6px;
+}
+.form-label .req { color: #ef4444; margin-left: 2px; }
+.form-label .hint { font-weight: 400; color: #9ca3af; font-size: 12px; margin-left: 6px; }
+.form-input, .form-textarea, .form-select {
+  width: 100%; padding: 10px 14px; border: 1.5px solid #e5e7eb; border-radius: 8px;
+  font-size: 14px; color: #2d3748; background: #fff; outline: none;
+  transition: border-color 0.15s; font-family: inherit;
+}
+.form-input:focus, .form-textarea:focus, .form-select:focus {
+  border-color: #4f8ef7; box-shadow: 0 0 0 3px rgba(79,142,247,0.1);
+}
+.form-textarea { resize: vertical; min-height: 80px; line-height: 1.6; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.radio-group { display: flex; gap: 12px; flex-wrap: wrap; }
+.radio-label {
+  display: flex; align-items: center; gap: 6px; cursor: pointer;
+  font-size: 13px; color: #374151; padding: 7px 14px;
+  border: 1.5px solid #e5e7eb; border-radius: 8px; transition: all 0.15s;
+}
+.radio-label:hover { border-color: #4f8ef7; }
+.radio-label input { display: none; }
+.radio-label.selected { border-color: #4f8ef7; background: #eff6ff; color: #3b82f6; font-weight: 500; }
+
+/* ── Dynamic cards ── */
+.dynamic-section { margin-bottom: 20px; }
+.dynamic-cards { display: flex; flex-direction: column; gap: 14px; }
+.dynamic-card {
+  border: 1.5px solid #e5e7eb; border-radius: 12px; padding: 18px;
+  background: #fafafa; position: relative;
+}
+.dynamic-card-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 14px;
+}
+.dynamic-card-title { font-size: 13px; font-weight: 600; color: #374151; }
+.remove-btn {
+  width: 26px; height: 26px; border-radius: 6px; border: none; background: #fee2e2;
+  color: #ef4444; cursor: pointer; display: flex; align-items: center;
+  justify-content: center; font-size: 14px; transition: all 0.15s; flex-shrink: 0;
+}
+.remove-btn:hover { background: #fca5a5; }
+.add-btn {
+  display: flex; align-items: center; gap: 6px; padding: 9px 16px;
+  border: 1.5px dashed #d1d5db; border-radius: 8px; background: transparent;
+  color: #6b7280; font-size: 13px; cursor: pointer; transition: all 0.15s;
+  width: 100%; justify-content: center; font-family: inherit;
+}
+.add-btn:hover { border-color: #4f8ef7; color: #4f8ef7; background: #eff6ff; }
+
+/* ── FAQ section ── */
+.faq-item { display: flex; flex-direction: column; gap: 8px; padding: 14px; background: #f8fafc; border: 1.5px solid #e5e7eb; border-radius: 10px; }
+.faq-item-header { display: flex; justify-content: space-between; align-items: center; }
+.faq-q-label { font-size: 12px; font-weight: 600; color: #4f8ef7; }
+.ai-btn {
+  display: flex; align-items: center; gap: 6px; padding: 9px 18px;
+  border-radius: 8px; border: none; background: linear-gradient(135deg, #667eea, #764ba2);
+  color: #fff; font-size: 13px; font-weight: 500; cursor: pointer;
+  transition: all 0.15s; font-family: inherit;
+}
+.ai-btn:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(102,126,234,0.3); }
+.ai-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.ai-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.ai-bar-note { font-size: 12px; color: #9ca3af; }
+
+/* ── Navigation buttons ── */
+.nav-btns {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: 28px; padding-top: 24px; border-top: 1px solid #f0f2f5;
+}
+.btn-prev {
+  padding: 10px 24px; border: 1.5px solid #e5e7eb; border-radius: 8px;
+  background: #fff; color: #6b7280; font-size: 14px; cursor: pointer;
+  font-family: inherit; transition: all 0.15s;
+}
+.btn-prev:hover { border-color: #d1d5db; background: #f9fafb; }
+.btn-next {
+  padding: 10px 28px; border: none; border-radius: 8px;
+  background: #4f8ef7; color: #fff; font-size: 14px; font-weight: 500;
+  cursor: pointer; font-family: inherit; transition: all 0.15s;
+}
+.btn-next:hover { background: #3b7de8; box-shadow: 0 4px 12px rgba(79,142,247,0.3); }
+.btn-next.danger { background: #22c55e; }
+.btn-next.danger:hover { background: #16a34a; box-shadow: 0 4px 12px rgba(34,197,94,0.3); }
+
+/* ── Complete page ── */
+.complete-page { text-align: center; padding: 20px 0; }
+.complete-icon { font-size: 56px; margin-bottom: 12px; }
+.complete-page h2 { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+.complete-page p { color: #6b7280; font-size: 14px; margin-bottom: 28px; }
+.filename-row {
+  display: flex; align-items: center; gap: 8px; max-width: 480px;
+  margin: 0 auto 24px; background: #f8fafc; border: 1.5px solid #e5e7eb;
+  border-radius: 10px; padding: 6px 6px 6px 14px;
+}
+.filename-row input {
+  flex: 1; border: none; background: transparent; font-size: 14px;
+  color: #2d3748; outline: none; font-family: inherit;
+}
+.filename-ext { font-size: 13px; color: #6b7280; font-weight: 500; white-space: nowrap; }
+.md-preview-wrap { margin: 0 auto 24px; max-width: 600px; text-align: left; }
+.md-preview-toggle {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 16px; background: #f3f4f6; border-radius: 8px;
+  cursor: pointer; font-size: 13px; color: #374151; font-weight: 500;
+  border: 1px solid #e5e7eb; user-select: none;
+}
+.md-preview-content {
+  display: none; background: #1e1e2e; color: #cdd6f4; font-family: 'Courier New', monospace;
+  font-size: 12px; padding: 16px; border-radius: 0 0 8px 8px; white-space: pre-wrap;
+  word-break: break-all; max-height: 400px; overflow-y: auto;
+  border: 1px solid #e5e7eb; border-top: none; line-height: 1.6;
+}
+.md-preview-content.open { display: block; }
+.action-btns { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.btn-download {
+  padding: 12px 28px; border-radius: 10px; border: none;
+  background: #4f8ef7; color: #fff; font-size: 14px; font-weight: 500;
+  cursor: pointer; font-family: inherit; transition: all 0.15s;
+  display: flex; align-items: center; gap: 6px;
+}
+.btn-download:hover { background: #3b7de8; box-shadow: 0 4px 12px rgba(79,142,247,0.3); }
+.btn-upload {
+  padding: 12px 28px; border-radius: 10px; border: none;
+  background: linear-gradient(135deg, #34d399, #059669); color: #fff;
+  font-size: 14px; font-weight: 500; cursor: pointer; font-family: inherit;
+  transition: all 0.15s; display: flex; align-items: center; gap: 6px;
+}
+.btn-upload:hover { opacity: 0.9; box-shadow: 0 4px 12px rgba(5,150,105,0.3); }
+.btn-upload:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-restart {
+  padding: 12px 24px; border-radius: 10px; border: 1.5px solid #e5e7eb;
+  background: #fff; color: #6b7280; font-size: 14px; cursor: pointer;
+  font-family: inherit; transition: all 0.15s;
+}
+.btn-restart:hover { background: #f9fafb; border-color: #d1d5db; }
+.upload-msg { margin-top: 14px; font-size: 13px; }
+.upload-msg.ok { color: #16a34a; }
+.upload-msg.err { color: #ef4444; }
+
+/* ── Modal ── */
+.modal-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+  z-index: 1000; align-items: center; justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: #fff; border-radius: 16px; padding: 28px; width: 420px;
+  max-width: calc(100vw - 40px); box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+}
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.modal-title { font-size: 16px; font-weight: 700; color: #1a202c; }
+.modal-close { cursor: pointer; font-size: 20px; color: #9ca3af; background: none; border: none; padding: 2px; }
+.modal-close:hover { color: #374151; }
+.modal-section { margin-bottom: 16px; }
+.modal-section-label { font-size: 11px; font-weight: 600; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+.modal-info { font-size: 13px; color: #374151; padding: 8px 12px; background: #f3f4f6; border-radius: 8px; }
+.modal-link { display: block; margin-top: 12px; font-size: 13px; color: #4f8ef7; text-decoration: none; }
+.modal-link:hover { text-decoration: underline; }
+
+/* ── Toast ── */
+#toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+  background: #1a202c; color: #fff; padding: 10px 20px; border-radius: 24px;
+  font-size: 13px; z-index: 2000; transition: transform 0.3s ease; pointer-events: none;
+  white-space: nowrap;
+}
+#toast.show { transform: translateX(-50%) translateY(0); }
+
+/* ── Draft banner ── */
+.draft-banner {
+  background: linear-gradient(135deg, #fef9c3, #fef3c7); border: 1px solid #fde68a;
+  border-radius: 10px; padding: 12px 16px; margin-bottom: 20px;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  font-size: 13px; color: #92400e;
+}
+.draft-banner-actions { display: flex; gap: 8px; }
+.draft-btn-y {
+  padding: 5px 14px; border: none; border-radius: 6px; background: #d97706;
+  color: #fff; font-size: 12px; cursor: pointer; font-family: inherit;
+}
+.draft-btn-y:hover { background: #b45309; }
+.draft-btn-n {
+  padding: 5px 14px; border: 1px solid #d97706; border-radius: 6px; background: transparent;
+  color: #d97706; font-size: 12px; cursor: pointer; font-family: inherit;
+}
+.draft-btn-n:hover { background: #fef3c7; }
+
+/* ── Spinner ── */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner {
+  display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite;
+}
+
+/* ── Info-ref category tag ── */
+.cat-select { max-width: 200px; }
+
+@media (max-width: 600px) {
+  .form-grid { grid-template-columns: 1fr; }
+  .type-cards { flex-direction: column; align-items: center; }
+  .card { padding: 20px 16px; }
+  .progress-step .step-label { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header class="app-header">
+  <h1>🛠️ SOP 文件生成器</h1>
+  <div class="header-actions">
+    <a href="./index.html" class="back-link">← 回 SOP 助理</a>
+    <button class="icon-btn" onclick="openSettings()" title="設定">⚙️</button>
+  </div>
+</header>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- Settings modal -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">⚙️ 設定</span>
+      <button class="modal-close" onclick="closeSettings()">✕</button>
+    </div>
+    <div class="modal-section">
+      <div class="modal-section-label">AI Provider / Model</div>
+      <div class="modal-info" id="settingsProviderInfo">載入中...</div>
+    </div>
+    <div class="modal-section">
+      <div class="modal-section-label">API Key 狀態</div>
+      <div class="modal-info" id="settingsApiInfo">載入中...</div>
+      <a href="./index.html" class="modal-link">→ 前往主頁面設定 API Key</a>
+    </div>
+    <div class="modal-section">
+      <div class="modal-section-label">OAuth Client ID（用於上傳 Google Drive）</div>
+      <input class="form-input" id="settingsOAuthInput" placeholder="貼入 OAuth Client ID..." style="margin-top:4px">
+      <button onclick="saveOAuth()" style="margin-top:8px;padding:7px 16px;border:none;border-radius:6px;background:#4f8ef7;color:#fff;font-size:13px;cursor:pointer;font-family:inherit;">儲存</button>
+    </div>
+    <div class="modal-section">
+      <button onclick="clearDraft()" style="padding:7px 16px;border:1px solid #fca5a5;border-radius:6px;background:#fff;color:#ef4444;font-size:13px;cursor:pointer;font-family:inherit;">🗑 清除草稿</button>
+    </div>
+  </div>
+</div>
+
+<!-- Main -->
+<div class="main" id="appRoot"></div>
+
+<script>
+// ── Constants ──────────────────────────────────────────────
+const FOLDER_ID = '1C4Eg8j2uqomZL9bpKaAGDHJsa-tRJg0D';
+const DRAFT_KEY = 'sop_generator_draft';
+
+const SOP_STEPS = ['基本資訊', '適用對象', '前置準備', '標準步驟', '異常處理', 'FAQ', '維護資訊', '完成'];
+const REF_STEPS = ['基本資訊', '資訊內容', 'FAQ', '完成'];
+
+// ── State ──────────────────────────────────────────────────
+let docType = null; // 'sop' | 'ref'
+let currentStep = 0;
+let sopData = {};
+let refData = {};
+let oauthToken = null;
+let gisInited = false;
+let tokenClient = null;
+let pendingUpload = false;
+
+// ── Helpers ────────────────────────────────────────────────
+function getApiKeys() {
+  try {
+    const raw = localStorage.getItem('sop_apikeys');
+    if (raw) { const arr = JSON.parse(raw); if (Array.isArray(arr) && arr.length) return arr; }
+  } catch(e) {}
+  const single = localStorage.getItem('sop_apikey') || localStorage.getItem('openai_key') || '';
+  return single ? [single] : [];
+}
+
+function loadSettings() {
+  return {
+    provider: localStorage.getItem('sop_provider') || 'gemini',
+    model: localStorage.getItem('sop_model') || 'gemini-2.5-flash-lite-preview-06-17'
+  };
+}
+
+function toast(msg, duration = 2400) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), duration);
+}
+
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function v(id) {
+  const el = document.getElementById(id);
+  return el ? el.value.trim() : '';
+}
+
+function sv(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.value = val || '';
+}
+
+// ── Draft ──────────────────────────────────────────────────
+function saveDraft() {
+  try {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ docType, currentStep, sopData, refData, ts: Date.now() }));
+  } catch(e) {}
+}
+
+function loadDraftData() {
+  try { return JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); } catch(e) { return null; }
+}
+
+function clearDraft() {
+  localStorage.removeItem(DRAFT_KEY);
+  toast('草稿已清除');
+  closeSettings();
+}
+
+// ── Collect form data helpers ──────────────────────────────
+function collectRadio(name) {
+  const el = document.querySelector(`input[name="${name}"]:checked`);
+  return el ? el.value : '';
+}
+
+// ── Render ─────────────────────────────────────────────────
+function render() {
+  const root = document.getElementById('appRoot');
+  root.innerHTML = '';
+
+  if (!docType) {
+    root.appendChild(renderTypeSelect());
+    return;
+  }
+
+  const steps = docType === 'sop' ? SOP_STEPS : REF_STEPS;
+  const lastStep = steps.length - 1;
+
+  if (currentStep === lastStep) {
+    root.appendChild(renderComplete());
+    return;
+  }
+
+  // Progress
+  root.appendChild(renderProgressBar(steps));
+
+  // Step content
+  const card = document.createElement('div');
+  card.className = 'card';
+  if (docType === 'sop') {
+    card.innerHTML = renderSopStep(currentStep);
+  } else {
+    card.innerHTML = renderRefStep(currentStep);
+  }
+  root.appendChild(card);
+
+  // Nav
+  root.appendChild(renderNavBtns(currentStep, lastStep));
+
+  // Re-attach dynamic interactions
+  attachRadioHandlers();
+  attachDynamicHandlers();
+
+  // Restore data
+  restoreStep();
+}
+
+// ── Type select page ───────────────────────────────────────
+function renderTypeSelect() {
+  const wrap = document.createElement('div');
+
+  // Check for draft
+  const draft = loadDraftData();
+  if (draft && draft.docType) {
+    const banner = document.createElement('div');
+    banner.className = 'draft-banner';
+    banner.innerHTML = `
+      <span>📝 發現未完成的草稿（${new Date(draft.ts).toLocaleDateString('zh-TW')} ${new Date(draft.ts).toLocaleTimeString('zh-TW', {hour:'2-digit',minute:'2-digit'})}），是否繼續填寫？</span>
+      <div class="draft-banner-actions">
+        <button class="draft-btn-y" onclick="resumeDraft()">繼續</button>
+        <button class="draft-btn-n" onclick="discardDraft()">捨棄</button>
+      </div>`;
+    wrap.appendChild(banner);
+  }
+
+  const page = document.createElement('div');
+  page.className = 'type-select-page';
+  page.innerHTML = `
+    <h2>請選擇要建立的文件類型</h2>
+    <p>根據內容性質選擇最合適的格式，完成後可一鍵匯出 .md 並上傳到 Google Drive</p>
+    <div class="type-cards">
+      <div class="type-card" onclick="selectDocType('sop')">
+        <div class="icon">📋</div>
+        <h3>完整 SOP</h3>
+        <p>有明確執行步驟的業務程序，例如報帳、請款、請假、開戶流程等</p>
+        <div class="tag">7 大區塊 · 步驟 / 異常處理</div>
+      </div>
+      <div class="type-card" onclick="selectDocType('ref')">
+        <div class="icon">📌</div>
+        <h3>資訊參考</h3>
+        <p>「某資料去哪找」「某東西怎麼取得」「某系統帳號申請」等純資訊類文件</p>
+        <div class="tag">3 大區塊 · 輕量快速</div>
+      </div>
+    </div>`;
+  wrap.appendChild(page);
+  return wrap;
+}
+
+function selectDocType(type) {
+  docType = type;
+  currentStep = 0;
+  sopData = {};
+  refData = {};
+  render();
+}
+
+function resumeDraft() {
+  const draft = loadDraftData();
+  if (!draft) return;
+  docType = draft.docType;
+  currentStep = draft.currentStep;
+  sopData = draft.sopData || {};
+  refData = draft.refData || {};
+  render();
+}
+
+function discardDraft() {
+  localStorage.removeItem(DRAFT_KEY);
+  document.querySelector('.draft-banner')?.remove();
+}
+
+// ── Progress bar ───────────────────────────────────────────
+function renderProgressBar(steps) {
+  const wrap = document.createElement('div');
+  wrap.className = 'progress-wrap';
+  const inner = document.createElement('div');
+  inner.className = 'progress-steps';
+  steps.forEach((label, i) => {
+    const stepDiv = document.createElement('div');
+    stepDiv.className = 'progress-step';
+    const dotClass = i < currentStep ? 'done' : (i === currentStep ? 'active' : '');
+    const lblClass = i < currentStep ? 'done' : (i === currentStep ? 'active' : '');
+    stepDiv.innerHTML = `<div class="step-dot ${dotClass}">${i < currentStep ? '✓' : i + 1}</div>
+      <span class="step-label ${lblClass}">${label}</span>`;
+    inner.appendChild(stepDiv);
+    if (i < steps.length - 1) {
+      const conn = document.createElement('div');
+      conn.className = 'step-connector' + (i < currentStep ? ' done' : '');
+      inner.appendChild(conn);
+    }
+  });
+  wrap.appendChild(inner);
+  return wrap;
+}
+
+// ── Nav buttons ────────────────────────────────────────────
+function renderNavBtns(step, lastContentStep) {
+  const wrap = document.createElement('div');
+  wrap.className = 'nav-btns';
+  if (step > 0) {
+    wrap.innerHTML += `<button class="btn-prev" onclick="prevStep()">← 上一步</button>`;
+  } else {
+    wrap.innerHTML += `<button class="btn-prev" onclick="goHome()">← 選擇類型</button>`;
+  }
+  const isLast = (step === lastContentStep - 1);
+  const label = isLast ? '生成文件 ✨' : '下一步 →';
+  const cls = isLast ? 'btn-next danger' : 'btn-next';
+  wrap.innerHTML += `<button class="${cls}" onclick="nextStep()">${label}</button>`;
+  return wrap;
+}
+
+// ── SOP Steps ──────────────────────────────────────────────
+function renderSopStep(step) {
+  switch(step) {
+    case 0: return renderSopStep0();
+    case 1: return renderSopStep1();
+    case 2: return renderSopStep2();
+    case 3: return renderSopStep3();
+    case 4: return renderSopStep4();
+    case 5: return renderSopStep5();
+    case 6: return renderSopStep6();
+    default: return '';
+  }
+}
+
+function renderSopStep0() {
+  const d = sopData.step0 || {};
+  return `
+    <div class="card-title">① 基本資訊</div>
+    <div class="card-subtitle">填寫 SOP 的核心識別資訊</div>
+    <div class="form-group">
+      <label class="form-label">SOP 標題 <span class="req">*</span></label>
+      <input class="form-input" id="s0_title" placeholder="例：員工報帳申請流程" value="${esc(d.title||'')}">
+    </div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">部門名稱 <span class="hint">（選填）</span></label>
+        <input class="form-input" id="s0_dept" placeholder="例：財務部" value="${esc(d.dept||'')}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">預計耗時 <span class="hint">（選填）</span></label>
+        <input class="form-input" id="s0_duration" placeholder="例：15 分鐘" value="${esc(d.duration||'')}">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">一句話核心總結 <span class="req">*</span></label>
+      <input class="form-input" id="s0_summary" placeholder="例：說明員工如何提交費用報帳申請並取得核准" value="${esc(d.summary||'')}">
+    </div>
+    <div class="form-group">
+      <label class="form-label">重要程度</label>
+      <div class="radio-group" id="rg_importance">
+        ${['一般','重要','緊急'].map(v => `<label class="radio-label${(d.importance||'一般')===v?' selected':''}" data-rg="importance" data-v="${v}"><input type="radio" name="importance" value="${v}" ${(d.importance||'一般')===v?'checked':''}>${v}</label>`).join('')}
+      </div>
+    </div>`;
+}
+
+function renderSopStep1() {
+  const d = sopData.step1 || {};
+  return `
+    <div class="card-title">② 適用對象</div>
+    <div class="card-subtitle">明確定義這份 SOP 的使用範圍</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">適用對象 <span class="hint">（哪些人）</span></label>
+        <textarea class="form-textarea" id="s1_who" placeholder="例：所有全職員工">${esc(d.who||'')}</textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">不適用對象</label>
+        <textarea class="form-textarea" id="s1_nowho" placeholder="例：實習生、外包廠商">${esc(d.nowho||'')}</textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">適用情境 <span class="hint">（什麼時候）</span></label>
+        <textarea class="form-textarea" id="s1_when" placeholder="例：每月底前提交當月費用">${esc(d.when||'')}</textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">不適用情境</label>
+        <textarea class="form-textarea" id="s1_nowhen" placeholder="例：超過 3 個月的費用不受理">${esc(d.nowhen||'')}</textarea>
+      </div>
+    </div>`;
+}
+
+function renderSopStep2() {
+  const d = sopData.step2 || {};
+  return `
+    <div class="card-title">③ 前置準備</div>
+    <div class="card-subtitle">執行前需要備妥的資源</div>
+    <div class="form-group">
+      <label class="form-label">需要的系統權限 <span class="hint">（選填）</span></label>
+      <textarea class="form-textarea" id="s2_perm" placeholder="例：需要 ERP 系統的費用申請模組權限">${esc(d.perm||'')}</textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">硬體 / 工具 <span class="hint">（選填）</span></label>
+      <textarea class="form-textarea" id="s2_tools" placeholder="例：實體發票或收據正本">${esc(d.tools||'')}</textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">必要資料 / 文件 <span class="hint">（選填）</span></label>
+      <textarea class="form-textarea" id="s2_docs" placeholder="例：費用明細、主管口頭核准">${esc(d.docs||'')}</textarea>
+    </div>`;
+}
+
+function renderSopStep3() {
+  const d = sopData.step3 || {};
+  const steps = (d.steps && d.steps.length) ? d.steps : [{}];
+  return `
+    <div class="card-title">④ 標準步驟</div>
+    <div class="card-subtitle">依序列出每個執行步驟</div>
+    <div class="dynamic-section">
+      <div class="dynamic-cards" id="stepsContainer">
+        ${steps.map((s, i) => renderStepCard(s, i)).join('')}
+      </div>
+      <button class="add-btn" style="margin-top:12px" onclick="addStepCard()">＋ 新增步驟</button>
+    </div>`;
+}
+
+function renderStepCard(s, i) {
+  return `<div class="dynamic-card" id="stepCard_${i}">
+    <div class="dynamic-card-header">
+      <span class="dynamic-card-title">步驟 ${i + 1}</span>
+      ${i > 0 ? `<button class="remove-btn" onclick="removeStepCard(${i})">✕</button>` : ''}
+    </div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">步驟名稱</label>
+        <input class="form-input step-name" placeholder="例：填寫費用申請單" value="${esc(s.name||'')}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">執行人</label>
+        <input class="form-input step-who" placeholder="例：申請人" value="${esc(s.who||'')}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">操作位置 / 系統</label>
+        <input class="form-input step-where" placeholder="例：ERP → 費用申請" value="${esc(s.where||'')}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">完成指標</label>
+        <input class="form-input step-done" placeholder="例：系統顯示「申請已送出」" value="${esc(s.done||'')}">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">具體動作說明</label>
+      <textarea class="form-textarea step-action" placeholder="例：點選「新增申請」，填入日期、金額、類別、說明">${esc(s.action||'')}</textarea>
+    </div>
+    <div class="form-group" style="margin-bottom:0">
+      <label class="form-label">注意事項 <span class="hint">（選填）</span></label>
+      <input class="form-input step-note" placeholder="例：金額需與收據完全一致" value="${esc(s.note||'')}">
+    </div>
+  </div>`;
+}
+
+function renderSopStep4() {
+  const d = sopData.step4 || {};
+  const cases = (d.cases && d.cases.length) ? d.cases : [{}];
+  return `
+    <div class="card-title">⑤ 異常處理</div>
+    <div class="card-subtitle">列出可能遇到的問題及解決方式</div>
+    <div class="dynamic-section">
+      <div class="dynamic-cards" id="casesContainer">
+        ${cases.map((c, i) => renderCaseCard(c, i)).join('')}
+      </div>
+      <button class="add-btn" style="margin-top:12px" onclick="addCaseCard()">＋ 新增異常狀況</button>
+    </div>`;
+}
+
+function renderCaseCard(c, i) {
+  return `<div class="dynamic-card" id="caseCard_${i}">
+    <div class="dynamic-card-header">
+      <span class="dynamic-card-title">異常狀況 ${i + 1}</span>
+      ${i > 0 ? `<button class="remove-btn" onclick="removeCaseCard(${i})">✕</button>` : ''}
+    </div>
+    <div class="form-group">
+      <label class="form-label">狀況描述</label>
+      <input class="form-input case-problem" placeholder="例：系統顯示「金額超出上限」" value="${esc(c.problem||'')}">
+    </div>
+    <div class="form-group" style="margin-bottom:0">
+      <label class="form-label">解決方法</label>
+      <textarea class="form-textarea case-solution" placeholder="例：申請金額超過 NT$ 5,000 需主管在實體表單上簽核後另行提交">${esc(c.solution||'')}</textarea>
+    </div>
+  </div>`;
+}
+
+function renderSopStep5() {
+  const d = sopData.step5 || {};
+  const faqs = (d.faqs && d.faqs.length) ? d.faqs : [{ q: '', a: '' }];
+  return `
+    <div class="card-title">⑥ 常見問題 FAQ</div>
+    <div class="card-subtitle">建議至少 8 題，涵蓋不同角度的問題</div>
+    <div class="ai-bar">
+      <button class="ai-btn" id="aiFaqBtn" onclick="generateFaq()">🤖 AI 幫我想問題</button>
+      <span class="ai-bar-note">AI 會根據前面填寫的內容自動生成問題（需設定 API Key）</span>
+    </div>
+    <div class="dynamic-section">
+      <div class="dynamic-cards" id="faqContainer">
+        ${faqs.map((f, i) => renderFaqItem(f, i)).join('')}
+      </div>
+      <button class="add-btn" style="margin-top:12px" onclick="addFaqItem()">＋ 新增問題</button>
+    </div>`;
+}
+
+function renderFaqItem(f, i) {
+  return `<div class="faq-item" id="faqItem_${i}">
+    <div class="faq-item-header">
+      <span class="faq-q-label">Q${i + 1}</span>
+      ${i > 0 ? `<button class="remove-btn" onclick="removeFaqItem(${i})">✕</button>` : ''}
+    </div>
+    <input class="form-input faq-q" placeholder="問題..." value="${esc(f.q||'')}">
+    <textarea class="form-textarea faq-a" placeholder="答案..." style="min-height:60px">${esc(f.a||'')}</textarea>
+  </div>`;
+}
+
+function renderSopStep6() {
+  const d = sopData.step6 || {};
+  return `
+    <div class="card-title">⑦ 維護資訊</div>
+    <div class="card-subtitle">填寫文件管理相關資訊</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">最後更新日期</label>
+        <input class="form-input" type="date" id="s6_date" value="${esc(d.date||'')}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">文件負責人</label>
+        <input class="form-input" id="s6_owner" placeholder="例：財務組 / 王小明" value="${esc(d.owner||'')}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">職務代理人</label>
+        <input class="form-input" id="s6_deputy" placeholder="例：陳大華" value="${esc(d.deputy||'')}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">相關附件 / 連結 <span class="hint">（選填）</span></label>
+        <input class="form-input" id="s6_link" placeholder="例：https://..." value="${esc(d.link||'')}">
+      </div>
+    </div>`;
+}
+
+// ── Ref Steps ──────────────────────────────────────────────
+function renderRefStep(step) {
+  switch(step) {
+    case 0: return renderRefStep0();
+    case 1: return renderRefStep1();
+    case 2: return renderRefStep2();
+    default: return '';
+  }
+}
+
+function renderRefStep0() {
+  const d = refData.step0 || {};
+  return `
+    <div class="card-title">① 基本資訊</div>
+    <div class="card-subtitle">填寫這份資訊參考文件的識別資訊</div>
+    <div class="form-group">
+      <label class="form-label">文件標題 <span class="req">*</span></label>
+      <input class="form-input" id="r0_title" placeholder="例：費用報帳發票要去哪裡找" value="${esc(d.title||'')}">
+    </div>
+    <div class="form-group">
+      <label class="form-label">一句話說明 <span class="req">*</span></label>
+      <input class="form-input" id="r0_summary" placeholder="例：說明各種發票取得管道與注意事項" value="${esc(d.summary||'')}">
+    </div>
+    <div class="form-group">
+      <label class="form-label">適用對象 <span class="hint">（選填）</span></label>
+      <input class="form-input" id="r0_who" placeholder="例：財務部全體同仁" value="${esc(d.who||'')}">
+    </div>`;
+}
+
+const REF_CATS = ['去哪找', '怎麼取得', '注意事項', '相關連結', '其他'];
+
+function renderRefStep1() {
+  const d = refData.step1 || {};
+  const items = (d.items && d.items.length) ? d.items : [{}];
+  return `
+    <div class="card-title">② 資訊內容</div>
+    <div class="card-subtitle">依類別整理各項資訊，可新增多條</div>
+    <div class="dynamic-section">
+      <div class="dynamic-cards" id="refItemsContainer">
+        ${items.map((item, i) => renderRefItem(item, i)).join('')}
+      </div>
+      <button class="add-btn" style="margin-top:12px" onclick="addRefItem()">＋ 新增資訊條目</button>
+    </div>`;
+}
+
+function renderRefItem(item, i) {
+  const catOpts = REF_CATS.map(c => `<option value="${c}" ${(item.cat||'去哪找')===c?'selected':''}>${c}</option>`).join('');
+  return `<div class="dynamic-card" id="refItem_${i}">
+    <div class="dynamic-card-header">
+      <span class="dynamic-card-title">條目 ${i + 1}</span>
+      ${i > 0 ? `<button class="remove-btn" onclick="removeRefItem(${i})">✕</button>` : ''}
+    </div>
+    <div class="form-group">
+      <label class="form-label">類別</label>
+      <select class="form-select cat-select ref-item-cat">${catOpts}</select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">說明</label>
+      <textarea class="form-textarea ref-item-desc" placeholder="詳細說明...">${esc(item.desc||'')}</textarea>
+    </div>
+    <div class="form-group" style="margin-bottom:0">
+      <label class="form-label">連結 <span class="hint">（選填）</span></label>
+      <input class="form-input ref-item-url" placeholder="https://..." value="${esc(item.url||'')}">
+    </div>
+  </div>`;
+}
+
+function renderRefStep2() {
+  const d = refData.step2 || {};
+  const faqs = (d.faqs && d.faqs.length) ? d.faqs : [{ q: '', a: '' }];
+  return `
+    <div class="card-title">③ 常見問題 FAQ</div>
+    <div class="card-subtitle">建議 4-6 題</div>
+    <div class="ai-bar">
+      <button class="ai-btn" id="aiFaqBtn" onclick="generateFaq()">🤖 AI 幫我想問題</button>
+      <span class="ai-bar-note">AI 會根據前面填寫的內容自動生成問題（需設定 API Key）</span>
+    </div>
+    <div class="dynamic-section">
+      <div class="dynamic-cards" id="faqContainer">
+        ${faqs.map((f, i) => renderFaqItem(f, i)).join('')}
+      </div>
+      <button class="add-btn" style="margin-top:12px" onclick="addFaqItem()">＋ 新增問題</button>
+    </div>`;
+}
+
+// ── Complete page ──────────────────────────────────────────
+function renderComplete() {
+  const wrap = document.createElement('div');
+  wrap.className = 'card';
+  const title = docType === 'sop' ? (sopData.step0?.title || 'SOP文件') : (refData.step0?.title || '資訊參考');
+  const safeTitle = title.replace(/\s+/g, '-').replace(/[^\w\u4e00-\u9fff\-]/g, '');
+  const mdContent = generateMd();
+
+  wrap.innerHTML = `
+    <div class="complete-page">
+      <div class="complete-icon">✅</div>
+      <h2>文件已準備好！</h2>
+      <p>請為檔案命名，然後下載或直接上傳到 Google Drive</p>
+      <div class="filename-row">
+        <input id="filenameInput" value="${esc(safeTitle)}" placeholder="檔案名稱">
+        <span class="filename-ext">.md</span>
+      </div>
+      <div class="md-preview-wrap">
+        <div class="md-preview-toggle" onclick="togglePreview()">
+          <span>📄 預覽 .md 內容</span>
+          <span id="previewArrow">▶</span>
+        </div>
+        <pre class="md-preview-content" id="mdPreview">${esc(mdContent)}</pre>
+      </div>
+      <div class="action-btns">
+        <button class="btn-download" onclick="downloadMd()">⬇️ 下載 .md</button>
+        <button class="btn-upload" id="uploadBtn" onclick="uploadToDrive()">☁️ 上傳到 Google Drive</button>
+        <button class="btn-restart" onclick="restartAll()">🔄 建立新文件</button>
+      </div>
+      <div class="upload-msg" id="uploadMsg"></div>
+    </div>`;
+  return wrap;
+}
+
+function togglePreview() {
+  const el = document.getElementById('mdPreview');
+  const arrow = document.getElementById('previewArrow');
+  el.classList.toggle('open');
+  arrow.textContent = el.classList.contains('open') ? '▼' : '▶';
+}
+
+// ── Collect step data ──────────────────────────────────────
+function collectCurrentStep() {
+  if (docType === 'sop') {
+    switch(currentStep) {
+      case 0:
+        sopData.step0 = {
+          title: v('s0_title'), dept: v('s0_dept'),
+          duration: v('s0_duration'), summary: v('s0_summary'),
+          importance: collectRadio('importance') || '一般'
+        }; break;
+      case 1:
+        sopData.step1 = { who: v('s1_who'), nowho: v('s1_nowho'), when: v('s1_when'), nowhen: v('s1_nowhen') }; break;
+      case 2:
+        sopData.step2 = { perm: v('s2_perm'), tools: v('s2_tools'), docs: v('s2_docs') }; break;
+      case 3:
+        sopData.step3 = { steps: collectStepCards() }; break;
+      case 4:
+        sopData.step4 = { cases: collectCaseCards() }; break;
+      case 5:
+        sopData.step5 = { faqs: collectFaqs() }; break;
+      case 6:
+        sopData.step6 = { date: v('s6_date'), owner: v('s6_owner'), deputy: v('s6_deputy'), link: v('s6_link') }; break;
+    }
+  } else {
+    switch(currentStep) {
+      case 0:
+        refData.step0 = { title: v('r0_title'), summary: v('r0_summary'), who: v('r0_who') }; break;
+      case 1:
+        refData.step1 = { items: collectRefItems() }; break;
+      case 2:
+        refData.step2 = { faqs: collectFaqs() }; break;
+    }
+  }
+}
+
+function collectStepCards() {
+  return Array.from(document.querySelectorAll('#stepsContainer .dynamic-card')).map(card => ({
+    name: card.querySelector('.step-name')?.value.trim() || '',
+    who: card.querySelector('.step-who')?.value.trim() || '',
+    where: card.querySelector('.step-where')?.value.trim() || '',
+    action: card.querySelector('.step-action')?.value.trim() || '',
+    done: card.querySelector('.step-done')?.value.trim() || '',
+    note: card.querySelector('.step-note')?.value.trim() || ''
+  }));
+}
+
+function collectCaseCards() {
+  return Array.from(document.querySelectorAll('#casesContainer .dynamic-card')).map(card => ({
+    problem: card.querySelector('.case-problem')?.value.trim() || '',
+    solution: card.querySelector('.case-solution')?.value.trim() || ''
+  }));
+}
+
+function collectFaqs() {
+  return Array.from(document.querySelectorAll('#faqContainer .faq-item')).map(item => ({
+    q: item.querySelector('.faq-q')?.value.trim() || '',
+    a: item.querySelector('.faq-a')?.value.trim() || ''
+  }));
+}
+
+function collectRefItems() {
+  return Array.from(document.querySelectorAll('#refItemsContainer .dynamic-card')).map(card => ({
+    cat: card.querySelector('.ref-item-cat')?.value || '去哪找',
+    desc: card.querySelector('.ref-item-desc')?.value.trim() || '',
+    url: card.querySelector('.ref-item-url')?.value.trim() || ''
+  }));
+}
+
+// ── Validate ───────────────────────────────────────────────
+function validateCurrentStep() {
+  if (docType === 'sop') {
+    if (currentStep === 0) {
+      if (!v('s0_title')) { toast('⚠ 請填寫 SOP 標題'); return false; }
+      if (!v('s0_summary')) { toast('⚠ 請填寫一句話核心總結'); return false; }
+    }
+    if (currentStep === 5) {
+      const faqs = collectFaqs();
+      const filled = faqs.filter(f => f.q).length;
+      if (filled < 8) {
+        return confirm(`建議至少 8 題 FAQ，目前只有 ${filled} 題。確定繼續？`);
+      }
+    }
+  } else {
+    if (currentStep === 0) {
+      if (!v('r0_title')) { toast('⚠ 請填寫文件標題'); return false; }
+      if (!v('r0_summary')) { toast('⚠ 請填寫一句話說明'); return false; }
+    }
+    if (currentStep === 2) {
+      const faqs = collectFaqs();
+      const filled = faqs.filter(f => f.q).length;
+      if (filled < 4) {
+        return confirm(`建議至少 4 題 FAQ，目前只有 ${filled} 題。確定繼續？`);
+      }
+    }
+  }
+  return true;
+}
+
+// ── Navigation ─────────────────────────────────────────────
+function nextStep() {
+  if (!validateCurrentStep()) return;
+  collectCurrentStep();
+  saveDraft();
+  currentStep++;
+  render();
+  window.scrollTo(0, 0);
+}
+
+function prevStep() {
+  collectCurrentStep();
+  saveDraft();
+  currentStep--;
+  render();
+  window.scrollTo(0, 0);
+}
+
+function goHome() {
+  collectCurrentStep();
+  saveDraft();
+  docType = null;
+  render();
+  window.scrollTo(0, 0);
+}
+
+function restartAll() {
+  docType = null;
+  currentStep = 0;
+  sopData = {};
+  refData = {};
+  localStorage.removeItem(DRAFT_KEY);
+  render();
+  window.scrollTo(0, 0);
+}
+
+// ── Restore step data ──────────────────────────────────────
+function restoreStep() {
+  if (docType === 'sop') {
+    switch(currentStep) {
+      case 0: {
+        const d = sopData.step0 || {};
+        sv('s0_title', d.title); sv('s0_dept', d.dept);
+        sv('s0_duration', d.duration); sv('s0_summary', d.summary);
+        break;
+      }
+      case 1: {
+        const d = sopData.step1 || {};
+        sv('s1_who', d.who); sv('s1_nowho', d.nowho);
+        sv('s1_when', d.when); sv('s1_nowhen', d.nowhen);
+        break;
+      }
+      case 2: {
+        const d = sopData.step2 || {};
+        sv('s2_perm', d.perm); sv('s2_tools', d.tools); sv('s2_docs', d.docs);
+        break;
+      }
+      case 6: {
+        const d = sopData.step6 || {};
+        sv('s6_date', d.date); sv('s6_owner', d.owner);
+        sv('s6_deputy', d.deputy); sv('s6_link', d.link);
+        break;
+      }
+    }
+  } else {
+    if (currentStep === 0) {
+      const d = refData.step0 || {};
+      sv('r0_title', d.title); sv('r0_summary', d.summary); sv('r0_who', d.who);
+    }
+  }
+}
+
+// ── Dynamic card handlers ──────────────────────────────────
+function attachDynamicHandlers() {}
+
+function addStepCard() {
+  collectCurrentStep();
+  const steps = sopData.step3?.steps || [];
+  steps.push({});
+  sopData.step3 = { steps };
+  render();
+}
+
+function removeStepCard(i) {
+  collectCurrentStep();
+  const steps = sopData.step3?.steps || [];
+  steps.splice(i, 1);
+  sopData.step3 = { steps };
+  render();
+}
+
+function addCaseCard() {
+  collectCurrentStep();
+  const cases = sopData.step4?.cases || [];
+  cases.push({});
+  sopData.step4 = { cases };
+  render();
+}
+
+function removeCaseCard(i) {
+  collectCurrentStep();
+  const cases = sopData.step4?.cases || [];
+  cases.splice(i, 1);
+  sopData.step4 = { cases };
+  render();
+}
+
+function addFaqItem() {
+  collectCurrentStep();
+  if (docType === 'sop') {
+    const faqs = sopData.step5?.faqs || [];
+    faqs.push({ q: '', a: '' });
+    sopData.step5 = { faqs };
+  } else {
+    const faqs = refData.step2?.faqs || [];
+    faqs.push({ q: '', a: '' });
+    refData.step2 = { faqs };
+  }
+  render();
+}
+
+function removeFaqItem(i) {
+  collectCurrentStep();
+  if (docType === 'sop') {
+    const faqs = sopData.step5?.faqs || [];
+    faqs.splice(i, 1);
+    sopData.step5 = { faqs };
+  } else {
+    const faqs = refData.step2?.faqs || [];
+    faqs.splice(i, 1);
+    refData.step2 = { faqs };
+  }
+  render();
+}
+
+function addRefItem() {
+  collectCurrentStep();
+  const items = refData.step1?.items || [];
+  items.push({});
+  refData.step1 = { items };
+  render();
+}
+
+function removeRefItem(i) {
+  collectCurrentStep();
+  const items = refData.step1?.items || [];
+  items.splice(i, 1);
+  refData.step1 = { items };
+  render();
+}
+
+// ── Radio handler ──────────────────────────────────────────
+function attachRadioHandlers() {
+  document.querySelectorAll('.radio-label').forEach(lbl => {
+    lbl.addEventListener('click', function() {
+      const rg = this.dataset.rg;
+      document.querySelectorAll(`[data-rg="${rg}"]`).forEach(l => l.classList.remove('selected'));
+      this.classList.add('selected');
+      const inp = this.querySelector('input');
+      if (inp) inp.checked = true;
+    });
+  });
+}
+
+// ── AI FAQ generation ──────────────────────────────────────
+async function generateFaq() {
+  const keys = getApiKeys();
+  if (!keys.length) { toast('⚠ 請先在設定中設定 API Key'); return; }
+
+  const btn = document.getElementById('aiFaqBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> 生成中...';
+
+  try {
+    const context = buildFaqContext();
+    const { provider, model } = loadSettings();
+    const apiKey = keys[0];
+
+    const sysMsg = '你是一個專業的企業內部文件助理。';
+    const userMsg = `根據以下文件內容，生成 ${docType === 'sop' ? '10' : '6'} 個同事最可能詢問的問題。
+要求：口語化、涵蓋「怎麼做」「在哪裡」「什麼時候」「如果失敗」等不同角度。
+只輸出 JSON 陣列，每項只有問題字串，不要有其他文字。格式：["問題1", "問題2", ...]
+
+文件內容：
+${context}`;
+
+    let result = '';
+    if (provider === 'gemini') {
+      result = await callGemini(apiKey, model, sysMsg, userMsg);
+    } else {
+      result = await callOpenAI(apiKey, model, sysMsg, userMsg);
+    }
+
+    // Parse JSON
+    const match = result.match(/\[[\s\S]*\]/);
+    if (!match) throw new Error('無法解析 AI 回應');
+    const questions = JSON.parse(match[0]);
+
+    // Inject into FAQ
+    collectCurrentStep();
+    const newFaqs = questions.map(q => ({ q: String(q), a: '' }));
+    if (docType === 'sop') {
+      const existing = (sopData.step5?.faqs || []).filter(f => f.q || f.a);
+      sopData.step5 = { faqs: [...existing, ...newFaqs] };
+    } else {
+      const existing = (refData.step2?.faqs || []).filter(f => f.q || f.a);
+      refData.step2 = { faqs: [...existing, ...newFaqs] };
+    }
+    render();
+    toast(`✅ 已生成 ${questions.length} 個問題`);
+  } catch(e) {
+    toast('❌ AI 生成失敗：' + (e.message || e));
+    const btnEl = document.getElementById('aiFaqBtn');
+    if (btnEl) { btnEl.disabled = false; btnEl.innerHTML = '🤖 AI 幫我想問題'; }
+  }
+}
+
+function buildFaqContext() {
+  if (docType === 'sop') {
+    const s0 = sopData.step0 || {};
+    const s1 = sopData.step1 || {};
+    const s2 = sopData.step2 || {};
+    const s3 = sopData.step3 || {};
+    const parts = [
+      `SOP名稱：${s0.title || ''}`,
+      `核心總結：${s0.summary || ''}`,
+      `適用對象：${s1.who || ''}`,
+      `前置準備：${[s2.perm, s2.tools, s2.docs].filter(Boolean).join('、')}`,
+    ];
+    if (s3.steps?.length) {
+      parts.push('步驟：' + s3.steps.map((s,i) => `${i+1}. ${s.name} — ${s.action}`).join('；'));
+    }
+    return parts.join('\n');
+  } else {
+    const r0 = refData.step0 || {};
+    const r1 = refData.step1 || {};
+    const parts = [
+      `文件標題：${r0.title || ''}`,
+      `說明：${r0.summary || ''}`,
+    ];
+    if (r1.items?.length) {
+      parts.push('內容：' + r1.items.map(it => `[${it.cat}] ${it.desc}`).join('；'));
+    }
+    return parts.join('\n');
+  }
+}
+
+// ── Gemini / OpenAI API ────────────────────────────────────
+async function callGemini(apiKey, model, sysMsg, userMsg) {
+  const body = {
+    system_instruction: { parts: [{ text: sysMsg }] },
+    contents: [{ role: 'user', parts: [{ text: userMsg }] }],
+    generationConfig: { temperature: 0.7, maxOutputTokens: 2048 }
+  };
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+  });
+  if (!res.ok) { const t = await res.text(); throw new Error(`Gemini ${res.status}: ${t.slice(0,200)}`); }
+  const data = await res.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+}
+
+async function callOpenAI(apiKey, model, sysMsg, userMsg) {
+  const body = {
+    model, messages: [{ role: 'system', content: sysMsg }, { role: 'user', content: userMsg }],
+    temperature: 0.7, max_tokens: 2048
+  };
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) { const t = await res.text(); throw new Error(`OpenAI ${res.status}: ${t.slice(0,200)}`); }
+  const data = await res.json();
+  return data.choices?.[0]?.message?.content || '';
+}
+
+// ── MD Generation ──────────────────────────────────────────
+function generateMd() {
+  return docType === 'sop' ? generateSopMd() : generateRefMd();
+}
+
+function generateSopMd() {
+  const s0 = sopData.step0 || {};
+  const s1 = sopData.step1 || {};
+  const s2 = sopData.step2 || {};
+  const s3 = sopData.step3 || {};
+  const s4 = sopData.step4 || {};
+  const s5 = sopData.step5 || {};
+  const s6 = sopData.step6 || {};
+
+  const lines = [];
+  lines.push(`# ${s0.title || '（未命名）'}`);
+  const meta = [s0.dept && `**部門**：${s0.dept}`, `**重要程度**：${s0.importance || '一般'}`, s0.duration && `**預計耗時**：${s0.duration}`].filter(Boolean);
+  if (meta.length) lines.push('> ' + meta.join(' ｜ '));
+  lines.push('');
+  lines.push('## 一句話核心總結');
+  lines.push(s0.summary || '');
+  lines.push('');
+  lines.push('---');
+  lines.push('');
+  lines.push('## 適用對象');
+  lines.push('| 項目 | 詳細描述 |');
+  lines.push('|------|---------|');
+  if (s1.who) lines.push(`| 適用對象 | ${s1.who} |`);
+  if (s1.when) lines.push(`| 適用情境 | ${s1.when} |`);
+  if (s1.nowho) lines.push(`| 不適用對象 | ${s1.nowho} |`);
+  if (s1.nowhen) lines.push(`| 不適用情境 | ${s1.nowhen} |`);
+  lines.push('');
+  lines.push('---');
+  lines.push('');
+  lines.push('## 前置準備');
+  if (s2.perm) lines.push(`- **系統權限**：${s2.perm}`);
+  if (s2.tools) lines.push(`- **硬體/工具**：${s2.tools}`);
+  if (s2.docs) lines.push(`- **必要資料**：${s2.docs}`);
+  if (!s2.perm && !s2.tools && !s2.docs) lines.push('（無特殊前置需求）');
+  lines.push('');
+  lines.push('---');
+  lines.push('');
+  lines.push('## 標準步驟');
+  const steps = s3.steps || [];
+  if (steps.length) {
+    steps.forEach((s, i) => {
+      lines.push(`### 步驟 ${i+1}：${s.name || '（未命名）'}`);
+      if (s.who) lines.push(`- **執行人**：${s.who}`);
+      if (s.where) lines.push(`- **操作位置**：${s.where}`);
+      if (s.action) lines.push(`- **具體動作**：${s.action}`);
+      if (s.done) lines.push(`- **完成指標**：${s.done}`);
+      if (s.note) lines.push(`- **注意事項**：${s.note}`);
+      lines.push('');
+    });
+  } else {
+    lines.push('（尚未填寫步驟）');
+    lines.push('');
+  }
+  lines.push('---');
+  lines.push('');
+  lines.push('## 異常處理');
+  const cases = s4.cases || [];
+  if (cases.length && cases.some(c => c.problem)) {
+    cases.forEach(c => {
+      if (!c.problem) return;
+      lines.push(`**狀況：${c.problem}**`);
+      lines.push(`解決方法：${c.solution || '（待補充）'}`);
+      lines.push('');
+    });
+  } else {
+    lines.push('（暫無已知異常狀況）');
+    lines.push('');
+  }
+  lines.push('---');
+  lines.push('');
+  lines.push('## 常見問題 FAQ');
+  const faqs = (s5.faqs || []).filter(f => f.q);
+  if (faqs.length) {
+    faqs.forEach(f => {
+      lines.push(`**Q：${f.q}**`);
+      lines.push(`A：${f.a || '（待補充）'}`);
+      lines.push('');
+    });
+  } else {
+    lines.push('（尚未填寫 FAQ）');
+    lines.push('');
+  }
+  lines.push('---');
+  lines.push('');
+  lines.push('## 維護資訊');
+  if (s6.date) lines.push(`- **最後更新**：${s6.date}`);
+  if (s6.owner) lines.push(`- **文件負責人**：${s6.owner}`);
+  if (s6.deputy) lines.push(`- **職務代理人**：${s6.deputy}`);
+  if (s6.link) lines.push(`- **相關附件**：${s6.link}`);
+
+  return lines.join('\n');
+}
+
+function generateRefMd() {
+  const r0 = refData.step0 || {};
+  const r1 = refData.step1 || {};
+  const r2 = refData.step2 || {};
+
+  const lines = [];
+  lines.push(`# ${r0.title || '（未命名）'}`);
+  lines.push('');
+  lines.push('## 一句話說明');
+  lines.push(r0.summary || '');
+  if (r0.who) {
+    lines.push('');
+    lines.push(`**適用對象**：${r0.who}`);
+  }
+  lines.push('');
+  lines.push('---');
+  lines.push('');
+  lines.push('## 資訊內容');
+  lines.push('');
+  const items = r1.items || [];
+  if (items.length && items.some(it => it.desc)) {
+    items.forEach(it => {
+      if (!it.desc && !it.url) return;
+      lines.push(`### ${it.cat || '其他'}`);
+      if (it.desc) lines.push(it.desc);
+      if (it.url) lines.push(`（連結：${it.url}）`);
+      lines.push('');
+    });
+  } else {
+    lines.push('（尚未填寫資訊內容）');
+    lines.push('');
+  }
+  lines.push('---');
+  lines.push('');
+  lines.push('## 常見問題 FAQ');
+  lines.push('');
+  const faqs = (r2.faqs || []).filter(f => f.q);
+  if (faqs.length) {
+    faqs.forEach(f => {
+      lines.push(`**Q：${f.q}**`);
+      lines.push(`A：${f.a || '（待補充）'}`);
+      lines.push('');
+    });
+  } else {
+    lines.push('（尚未填寫 FAQ）');
+    lines.push('');
+  }
+  lines.push('---');
+  lines.push('');
+  lines.push('## 維護資訊');
+  lines.push(`- **最後更新**：${new Date().toLocaleDateString('zh-TW')}`);
+
+  return lines.join('\n');
+}
+
+// ── Download ───────────────────────────────────────────────
+function downloadMd() {
+  const filename = (document.getElementById('filenameInput')?.value.trim() || 'document') + '.md';
+  const content = generateMd();
+  const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+  toast('✅ 檔案下載中...');
+}
+
+// ── Google Drive Upload ────────────────────────────────────
+function initGIS() {
+  if (gisInited) return;
+  const clientId = localStorage.getItem('oauth_client_id');
+  if (!clientId) { toast('⚠ 請先在設定中填入 OAuth Client ID'); return; }
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: clientId,
+    scope: 'https://www.googleapis.com/auth/drive.file',
+    callback: async (resp) => {
+      if (resp.error) { showUploadMsg('❌ Google 授權失敗：' + resp.error, true); return; }
+      oauthToken = resp.access_token;
+      if (pendingUpload) { pendingUpload = false; await doUpload(); }
+    }
+  });
+  gisInited = true;
+}
+
+async function uploadToDrive() {
+  const clientId = localStorage.getItem('oauth_client_id');
+  if (!clientId) { showUploadMsg('❌ 請先在設定中填入 OAuth Client ID', true); openSettings(); return; }
+  if (typeof google === 'undefined') { showUploadMsg('❌ Google Identity Services 尚未載入，請重新整理頁面', true); return; }
+  initGIS();
+  if (!oauthToken) {
+    pendingUpload = true;
+    tokenClient.requestAccessToken({ prompt: 'consent' });
+  } else {
+    await doUpload();
+  }
+}
+
+async function doUpload() {
+  const btn = document.getElementById('uploadBtn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner" style="border-color:rgba(255,255,255,.3);border-top-color:#fff"></span> 上傳中...'; }
+  showUploadMsg('');
+
+  const filename = (document.getElementById('filenameInput')?.value.trim() || 'document') + '.md';
+  const content = generateMd();
+
+  try {
+    const metadata = { name: filename, mimeType: 'text/markdown', parents: [FOLDER_ID] };
+    const form = new FormData();
+    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+    form.append('file', new Blob([content], { type: 'text/markdown' }));
+
+    const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${oauthToken}` },
+      body: form
+    });
+
+    if (res.status === 401) {
+      oauthToken = null; pendingUpload = true;
+      tokenClient.requestAccessToken({ prompt: '' });
+      return;
+    }
+    if (!res.ok) {
+      const t = await res.text();
+      throw new Error(`HTTP ${res.status}: ${t.slice(0, 200)}`);
+    }
+
+    const data = await res.json();
+    const link = data.webViewLink || `https://drive.google.com/file/d/${data.id}/view`;
+    showUploadMsg(`✅ 已上傳！<a href="${link}" target="_blank" rel="noopener">在 Drive 中查看</a>　　重新整理 SOP 助理即可看到新文件`, false);
+  } catch(e) {
+    showUploadMsg('❌ 上傳失敗：' + (e.message || e), true);
+    oauthToken = null;
+  } finally {
+    const btnEl = document.getElementById('uploadBtn');
+    if (btnEl) { btnEl.disabled = false; btnEl.innerHTML = '☁️ 上傳到 Google Drive'; }
+  }
+}
+
+function showUploadMsg(msg, isError) {
+  const el = document.getElementById('uploadMsg');
+  if (!el) return;
+  el.innerHTML = msg;
+  el.className = 'upload-msg ' + (isError ? 'err' : 'ok');
+}
+
+// ── Settings modal ─────────────────────────────────────────
+function openSettings() {
+  const keys = getApiKeys();
+  const { provider, model } = loadSettings();
+  document.getElementById('settingsProviderInfo').textContent = `${provider} / ${model}`;
+  document.getElementById('settingsApiInfo').textContent = keys.length ? `已設定 ${keys.length} 組 Key` : '尚未設定 API Key';
+  const oauthInput = document.getElementById('settingsOAuthInput');
+  oauthInput.value = localStorage.getItem('oauth_client_id') || '';
+  document.getElementById('settingsModal').classList.add('open');
+}
+
+function closeSettings() {
+  document.getElementById('settingsModal').classList.remove('open');
+}
+
+function saveOAuth() {
+  const val = document.getElementById('settingsOAuthInput').value.trim();
+  if (val) {
+    localStorage.setItem('oauth_client_id', val);
+    gisInited = false; // re-init with new ID
+    toast('✅ OAuth Client ID 已儲存');
+  } else {
+    localStorage.removeItem('oauth_client_id');
+    toast('已清除 OAuth Client ID');
+  }
+  closeSettings();
+}
+
+// Click outside modal to close
+document.getElementById('settingsModal').addEventListener('click', function(e) {
+  if (e.target === this) closeSettings();
+});
+
+// ── Init ───────────────────────────────────────────────────
+render();
+</script>
+
+<!-- Google Identity Services -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+</body>
+</html>
