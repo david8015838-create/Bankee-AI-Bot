@@ -1848,7 +1848,7 @@ D. 處理圖片與截圖
       statusEl.className = 'sop-status';
 
       const listRes = await fetch(
-        `https://www.googleapis.com/drive/v3/files?q=%27${FOLDER_ID}%27+in+parents+and+trashed=false&fields=files(id,name,mimeType,webViewLink,owners,lastModifyingUser)&key=${DRIVE_API_KEY}`
+        `https://www.googleapis.com/drive/v3/files?q=%27${FOLDER_ID}%27+in+parents+and+trashed=false&fields=files(id,name,mimeType,webViewLink)&key=${DRIVE_API_KEY}`
       );
 
       if (!listRes.ok) {
@@ -1882,8 +1882,7 @@ D. 處理圖片與截圖
             content = await res.text();
           }
           const cleanName = file.name.replace(/\.[^.]+$/, '');
-          const ownerName = file.owners?.[0]?.displayName || file.lastModifyingUser?.displayName || '未知';
-          sopFiles.push({ ...file, name: cleanName, originalName: file.name, content, ownerName });
+          sopFiles.push({ ...file, name: cleanName, originalName: file.name, content });
         } catch (e) {
           console.warn(`無法載入文件 ${file.name}:`, e);
         }
@@ -2464,7 +2463,6 @@ D. 處理圖片與截圖
           <a href="${f.webViewLink || '#'}" target="_blank"
              style="display:flex;flex-direction:column;flex:1;padding:4px 2px;text-decoration:none;color:#1a1a2e;min-width:0;">
             <span style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(f.name)}</span>
-            <span style="font-size:10.5px;color:#9ca3af;margin-top:1px;">上傳者：${escapeHtml(f.ownerName || '—')}</span>
           </a>
           <button onclick="openSopEditor(${idx})"
                   style="flex-shrink:0;padding:4px 10px;border:1px solid #d1d5db;border-radius:6px;background:#fff;color:#4f8ef7;font-size:11.5px;font-weight:500;cursor:pointer;white-space:nowrap;"
