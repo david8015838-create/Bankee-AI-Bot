@@ -2029,6 +2029,13 @@ D. 處理圖片與截圖
       sections.push(`=== 個人資料：通訊錄 ===\n${lines.join('\n')}`);
     }
 
+    // 常用連結
+    const links = JSON.parse(localStorage.getItem('personal_links') || '[]');
+    if (links.length > 0) {
+      const lines = links.map(l => `- ${l.name}：${l.url}`);
+      sections.push(`=== 個人資料：常用連結 ===\n${lines.join('\n')}`);
+    }
+
     return sections.join('\n\n');
   }
 
