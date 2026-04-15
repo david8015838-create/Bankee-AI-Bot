@@ -1915,23 +1915,10 @@ D. 處理圖片與截圖
         try {
           let content = '';
           if (file.mimeType === 'application/vnd.google-apps.document') {
-            // Export as HTML to preserve hyperlinks, then convert to plain text with URLs intact
             const res = await fetch(
-              `https://www.googleapis.com/drive/v3/files/${file.id}/export?mimeType=text%2Fhtml&key=${DRIVE_API_KEY}`
+              `https://www.googleapis.com/drive/v3/files/${file.id}/export?mimeType=text%2Fplain&key=${DRIVE_API_KEY}`
             );
-            const html = await res.text();
-            const doc = new DOMParser().parseFromString(html, 'text/html');
-            // Replace <a href="url">text</a> with "text（url）" so URLs are preserved as plain text
-            doc.querySelectorAll('a[href]').forEach(a => {
-              const href = a.getAttribute('href');
-              const text = a.textContent.trim();
-              if (href && href.startsWith('http') && href !== text) {
-                a.textContent = `${text}（${href}）`;
-              } else if (href && href.startsWith('http')) {
-                a.textContent = href;
-              }
-            });
-            content = doc.body ? doc.body.innerText || doc.body.textContent : doc.documentElement.textContent;
+            content = await res.text();
           } else {
             const res = await fetch(
               `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media&key=${DRIVE_API_KEY}`
