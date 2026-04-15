@@ -1605,7 +1605,7 @@ D. 處理圖片與截圖
     console.warn('marked renderer setup failed:', e);
   }
 
-  const SYSTEM_PROMPT = `你是部門的工作助理，除了回答 SOP 問題，也可以回答使用者個人工具中的內容（待辦清單、行事曆、筆記、通訊錄）。
+  const SYSTEM_PROMPT = `你是部門的工作助理，除了回答 SOP 問題，也可以回答使用者個人工具中的內容（待辦清單、行事曆、筆記、通訊錄、常用連結）。
 回答一律使用繁體中文。
 
 以下是所有可參考的資料（SOP 文件 + 使用者個人資料）：
@@ -1614,16 +1614,17 @@ D. 處理圖片與截圖
 
 回答規則：
 1. 根據上方資料回答，不自行推測或補充資料中沒有的資訊
-2. 若問題涉及「待辦」「行程」「筆記」「通訊錄」等個人工具，優先從「個人資料」區塊查詢並回答
-3. 問題明確時直接回答；問題模糊且不同情境答案不同時，先問一個最關鍵的問題（最多追問一次）
-4. 找不到答案時說：「這個問題我目前的資料裡沒有，建議詢問主管」
-5. 回答條列重點，步驟用數字編號，每步驟寫清楚做什麼、在哪裡做
-6. 回答末尾另起一行，必須加上（注意格式要完全一致）：
+2. 若問題涉及「待辦」「行程」「筆記」「通訊錄」「連結」等個人工具，優先從「個人資料」區塊查詢並回答
+3. 若文件內容中有 URL 或超連結（格式如 https://... 或 [文字](URL)），必須完整逐字引用該 URL，不可省略或改寫
+4. 問題明確時直接回答；問題模糊且不同情境答案不同時，先問一個最關鍵的問題（最多追問一次）
+5. 找不到答案時說：「這個問題我目前的資料裡沒有，建議詢問主管」
+6. 回答條列重點，步驟用數字編號，每步驟寫清楚做什麼、在哪裡做
+7. 回答末尾另起一行，必須加上（注意格式要完全一致）：
    【資料來源：文件名稱】
    若答案來自個人資料：【資料來源：個人資料】
    若參考多份文件：【資料來源：文件名稱1、文件名稱2】
    若無相關資料：【資料來源：無】
-7. 再另起一行，提供 2-3 個可能的後續問題（注意格式要完全一致）：
+8. 再另起一行，提供 2-3 個可能的後續問題（注意格式要完全一致）：
    【後續問題：問題一|問題二|問題三】`;
 
   // ═══════════════════════════════════════
@@ -1914,10 +1915,23 @@ D. 處理圖片與截圖
         try {
           let content = '';
           if (file.mimeType === 'application/vnd.google-apps.document') {
+            // Export as HTML to preserve hyperlinks, then convert to plain text with URLs intact
             const res = await fetch(
-              `https://www.googleapis.com/drive/v3/files/${file.id}/export?mimeType=text%2Fplain&key=${DRIVE_API_KEY}`
+              `https://www.googleapis.com/drive/v3/files/${file.id}/export?mimeType=text%2Fhtml&key=${DRIVE_API_KEY}`
             );
-            content = await res.text();
+            const html = await res.text();
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            // Replace <a href="url">text</a> with "text（url）" so URLs are preserved as plain text
+            doc.querySelectorAll('a[href]').forEach(a => {
+              const href = a.getAttribute('href');
+              const text = a.textContent.trim();
+              if (href && href.startsWith('http') && href !== text) {
+                a.textContent = `${text}（${href}）`;
+              } else if (href && href.startsWith('http')) {
+                a.textContent = href;
+              }
+            });
+            content = doc.body ? doc.body.innerText || doc.body.textContent : doc.documentElement.textContent;
           } else {
             const res = await fetch(
               `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media&key=${DRIVE_API_KEY}`
