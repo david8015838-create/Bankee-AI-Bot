@@ -1518,23 +1518,25 @@ D. 處理圖片與截圖
     openai: ['gpt-4o-mini', 'gpt-4o', 'gpt-4.1']
   };
 
-  const SYSTEM_PROMPT = `你是部門的工作助理，專門根據 SOP 文件回答同事的工作問題。
+  const SYSTEM_PROMPT = `你是部門的工作助理，除了回答 SOP 問題，也可以回答使用者個人工具中的內容（待辦清單、行事曆、筆記、通訊錄）。
 回答一律使用繁體中文。
 
-以下是所有可參考的 SOP 文件：
+以下是所有可參考的資料（SOP 文件 + 使用者個人資料）：
 
 {context}
 
 回答規則：
-1. 只根據上方文件內容回答，不自行推測或補充文件中沒有的資訊
-2. 問題明確時直接回答；問題模糊且不同情境答案不同時，先問一個最關鍵的問題（最多追問一次）
-3. 找不到答案時說：「這個問題我目前的資料裡沒有，建議詢問主管」
-4. 回答條列重點，步驟用數字編號，每步驟寫清楚做什麼、在哪裡做
-5. 回答末尾另起一行，必須加上（注意格式要完全一致）：
+1. 根據上方資料回答，不自行推測或補充資料中沒有的資訊
+2. 若問題涉及「待辦」「行程」「筆記」「通訊錄」等個人工具，優先從「個人資料」區塊查詢並回答
+3. 問題明確時直接回答；問題模糊且不同情境答案不同時，先問一個最關鍵的問題（最多追問一次）
+4. 找不到答案時說：「這個問題我目前的資料裡沒有，建議詢問主管」
+5. 回答條列重點，步驟用數字編號，每步驟寫清楚做什麼、在哪裡做
+6. 回答末尾另起一行，必須加上（注意格式要完全一致）：
    【資料來源：文件名稱】
+   若答案來自個人資料：【資料來源：個人資料】
    若參考多份文件：【資料來源：文件名稱1、文件名稱2】
    若無相關資料：【資料來源：無】
-6. 再另起一行，提供 2-3 個可能的後續問題（注意格式要完全一致）：
+7. 再另起一行，提供 2-3 個可能的後續問題（注意格式要完全一致）：
    【後續問題：問題一|問題二|問題三】`;
 
   // ═══════════════════════════════════════
@@ -1786,11 +1788,61 @@ D. 處理圖片與截圖
     updateContextBar();
   }
 
+  function buildPersonalContext() {
+    const sections = [];
+
+    // 待辦清單
+    const todos = JSON.parse(localStorage.getItem('personal_todos') || '[]');
+    if (todos.length > 0) {
+      const lines = todos.map(t => `- [${t.done ? '已完成' : '未完成'}] ${t.text}`);
+      sections.push(`=== 個人資料：待辦清單 ===\n${lines.join('\n')}`);
+    }
+
+    // 行事曆（依日期排序）
+    const events = JSON.parse(localStorage.getItem('personal_events') || '[]');
+    if (events.length > 0) {
+      const sorted = [...events].sort((a, b) => a.date.localeCompare(b.date));
+      const lines = sorted.map(e => {
+        const d = new Date(e.date);
+        const weekdays = ['日','一','二','三','四','五','六'];
+        const label = `${e.date}（週${weekdays[d.getDay()]}）`;
+        return `- ${label}：${e.title}${e.note ? `（${e.note}）` : ''}`;
+      });
+      sections.push(`=== 個人資料：行事曆 ===\n${lines.join('\n')}`);
+    }
+
+    // 筆記
+    const notes = JSON.parse(localStorage.getItem('personal_notes') || '[]');
+    if (notes.length > 0) {
+      const parts = notes.map(n => `--- 筆記：${n.title} ---\n${n.content}`);
+      sections.push(`=== 個人資料：筆記 ===\n${parts.join('\n\n')}`);
+    }
+
+    // 通訊錄
+    const contacts = JSON.parse(localStorage.getItem('personal_contacts') || '[]');
+    if (contacts.length > 0) {
+      const lines = contacts.map(c => {
+        const parts = [c.name];
+        if (c.dept) parts.push(c.dept);
+        if (c.phone) parts.push(`電話：${c.phone}`);
+        if (c.email) parts.push(`Email：${c.email}`);
+        if (c.note) parts.push(`備注：${c.note}`);
+        return `- ${parts.join(' | ')}`;
+      });
+      sections.push(`=== 個人資料：通訊錄 ===\n${lines.join('\n')}`);
+    }
+
+    return sections.join('\n\n');
+  }
+
   function buildContext() {
-    if (sopFiles.length === 0) return '（目前沒有可參考的 SOP 文件）';
-    return sopFiles.map(f =>
-      `=== 文件：${f.name} ===\n${f.content}`
-    ).join('\n\n---\n\n');
+    const sopContext = sopFiles.length === 0
+      ? '（目前沒有可參考的 SOP 文件）'
+      : sopFiles.map(f => `=== 文件：${f.name} ===\n${f.content}`).join('\n\n---\n\n');
+
+    const personalContext = buildPersonalContext();
+    if (!personalContext) return sopContext;
+    return `${sopContext}\n\n---\n\n${personalContext}`;
   }
 
   // ═══════════════════════════════════════
