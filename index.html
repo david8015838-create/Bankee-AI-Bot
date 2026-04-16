@@ -2318,42 +2318,50 @@ D. 處理圖片與截圖
       return answer + `\n\n**相關連結：**\n\n<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`;
     }
 
-    // Score each URL by matching its surrounding context against BOTH the question and answer.
-    // Question tokens weighted 3x (more specific signal), answer tokens weighted 1x.
-    // Use 2+ char Chinese sequences so "數位學習" discriminates better than single chars.
-    const tokenRegex = /[a-z0-9]{2,}|[\u4e00-\u9fff]{2,}/g;
-    const questionTokens = (userQuestion || '').toLowerCase().match(tokenRegex) || [];
-    const answerTokens = answer.toLowerCase().match(tokenRegex) || [];
+    // Section-based URL matching:
+    // Parse document into sections split by ## / ### headers.
+    // Score each section's HEADER (short, specific) against question+answer tokens.
+    // "eHRD 數位學習系統" header uniquely matches "eHRD是啥？" far better than long context windows.
+    const tokenRegex = /[a-z0-9]+|[\u4e00-\u9fff]+/g;
+    const questionTokens = new Set((userQuestion || '').toLowerCase().match(tokenRegex) || []);
+    const answerTokens   = new Set(answer.toLowerCase().match(tokenRegex) || []);
 
-    const scored = [];
+    // Build sections: { header: string, urls: string[] }
+    const sections = [];
     for (const file of sourceFiles) {
       const lines = (file.content || '').split('\n');
-      lines.forEach((line, idx) => {
-        const urls = line.match(urlRegex);
-        if (!urls) return;
-        // Context = wider window (15 lines) around the URL line for better discrimination
-        const ctx = [
-          ...lines.slice(Math.max(0, idx - 15), idx),
-          ...lines.slice(idx + 1, Math.min(lines.length, idx + 15))
-        ].join(' ').toLowerCase();
-
-        // Question match weighted 3x — e.g. "ehrd" from "eHRD是啥？" uniquely targets eHRD section
-        const score =
-          questionTokens.reduce((sum, t) => ctx.includes(t) ? sum + t.length * 3 : sum, 0) +
-          answerTokens.reduce((sum, t) => ctx.includes(t) ? sum + t.length : sum, 0);
-        urls.forEach(u => {
-          const clean = u.replace(/[.,;:!?]+$/, '');
-          if (!answer.includes(clean)) scored.push({ url: clean, score });
-        });
-      });
+      let currentHeader = '';
+      let currentUrls = [];
+      for (const line of lines) {
+        if (/^#{1,4}\s/.test(line)) {
+          if (currentUrls.length) sections.push({ header: currentHeader, urls: currentUrls });
+          currentHeader = line.replace(/^#+\s*/, '').toLowerCase();
+          currentUrls = [];
+        }
+        const found = line.match(urlRegex);
+        if (found) found.forEach(u => currentUrls.push(u.replace(/[.,;:!?]+$/, '')));
+      }
+      if (currentUrls.length) sections.push({ header: currentHeader, urls: currentUrls });
     }
+
+    // Score each section header: question token hit = length×5, answer token hit = length×1
+    const scored = sections
+      .map(sec => {
+        const headerTokens = sec.header.match(tokenRegex) || [];
+        const score = headerTokens.reduce((sum, t) => {
+          return sum + (questionTokens.has(t) ? t.length * 5 : 0)
+                     + (answerTokens.has(t)   ? t.length     : 0);
+        }, 0);
+        return { score, urls: sec.urls.filter(u => !answer.includes(u)) };
+      })
+      .filter(s => s.urls.length > 0);
 
     if (scored.length === 0) return answer;
     const maxScore = Math.max(...scored.map(r => r.score));
     if (maxScore === 0) return answer;
 
-    // Only inject highest-scoring URLs (exact max, no threshold)
-    const toInject = [...new Set(scored.filter(r => r.score === maxScore).map(r => r.url))];
+    const toInject = [...new Set(scored.filter(r => r.score === maxScore).flatMap(r => r.urls))];
+    if (toInject.length === 0) return answer;
     const linkHtml = toInject.map(u =>
       `<a href="${u}" target="_blank" rel="noopener noreferrer">${u}</a>`
     ).join('<br>');
