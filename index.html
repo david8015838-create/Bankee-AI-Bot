@@ -2295,6 +2295,8 @@ D. 處理圖片與截圖
       }
     }
 
+    console.log('🔍 injectMissingUrls — source:', sourceName, '| sourceFiles found:', sourceFiles.length, '| allUrls:', [...allUrls]);
+
     if (allUrls.size === 0) return answer;
 
     // Only add URLs that are not already present in the answer
