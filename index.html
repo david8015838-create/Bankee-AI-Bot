@@ -2297,12 +2297,10 @@ D. 處理圖片與截圖
 
     if (allUrls.size === 0) return answer;
 
-    // Only add URLs that are not already present in the answer
-    const missing = [...allUrls].filter(url => !answer.includes(url));
-    if (missing.length === 0) return answer;
-
-    // Use HTML anchor tags directly to avoid marked.js rendering issues
-    const linkHtml = missing.map(u => `<a href="${u}" target="_blank" rel="noopener noreferrer">${u}</a>`).join('<br>');
+    // Always show all source-file URLs explicitly so users can see and click them
+    const linkHtml = [...allUrls].map(u =>
+      `<a href="${u}" target="_blank" rel="noopener noreferrer">${u}</a>`
+    ).join('<br>');
     return answer + '\n\n**相關連結：**\n\n' + linkHtml;
   }
 
