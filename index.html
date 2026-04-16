@@ -1638,7 +1638,7 @@ D. 處理圖片與截圖
 回答規則：
 1. 根據上方資料回答，不自行推測或補充資料中沒有的資訊
 2. 若問題涉及「待辦」「行程」「筆記」「通訊錄」「連結」等個人工具，優先從「個人資料」區塊查詢並回答
-3. 若文件內容中有 URL 或超連結（格式如 https://... 或 [文字](URL)），必須完整逐字引用該 URL，不可省略或改寫
+3. 若文件內容中有 URL（格式如 https://... 或 （連結：https://...）），必須在回答中用 markdown 連結格式單獨一行輸出：[點此開啟](URL)，絕對不可省略、縮短或不輸出 URL
 4. 問題明確時直接回答；問題模糊且不同情境答案不同時，先問一個最關鍵的問題（最多追問一次）
 5. 找不到答案時說：「這個問題我目前的資料裡沒有，建議詢問主管」
 6. 回答條列重點，步驟用數字編號，每步驟寫清楚做什麼、在哪裡做
@@ -2440,6 +2440,7 @@ D. 處理圖片與截圖
       showTyping();
       try {
         const rawResponse = await callAI(userMessage);
+        console.log('🤖 Raw AI response:', rawResponse);
         removeTyping();
         const { answer, source, followups } = parseResponse(rawResponse);
         conversationHistory.push({ role: 'assistant', content: answer });
