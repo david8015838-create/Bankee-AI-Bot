@@ -2306,8 +2306,8 @@ D. 處理圖片與截圖
     }
 
     // Multiple URLs: score each by how well its surrounding text matches the AI's answer
-    // Use the answer (not question) because the AI already selected the relevant content
-    const answerTokens = answer.toLowerCase().match(/[a-z0-9]{2,}|[\u4e00-\u9fff]/g) || [];
+    // Require 2+ char Chinese sequences so "數位學習" discriminates better than single "數","位"
+    const answerTokens = answer.toLowerCase().match(/[a-z0-9]{2,}|[\u4e00-\u9fff]{2,}/g) || [];
 
     const scored = [];
     for (const file of sourceFiles) {
@@ -2315,13 +2315,14 @@ D. 處理圖片與截圖
       lines.forEach((line, idx) => {
         const urls = line.match(urlRegex);
         if (!urls) return;
-        // Context = surrounding lines, excluding the URL line itself
+        // Context = wider window (15 lines) around the URL line for better discrimination
         const ctx = [
-          ...lines.slice(Math.max(0, idx - 5), idx),
-          ...lines.slice(idx + 1, Math.min(lines.length, idx + 5))
+          ...lines.slice(Math.max(0, idx - 15), idx),
+          ...lines.slice(idx + 1, Math.min(lines.length, idx + 15))
         ].join(' ').toLowerCase();
 
-        const score = answerTokens.filter(t => ctx.includes(t)).length;
+        // Score: count matching tokens, weighted by token length (longer = more specific)
+        const score = answerTokens.reduce((sum, t) => ctx.includes(t) ? sum + t.length : sum, 0);
         urls.forEach(u => {
           const clean = u.replace(/[.,;:!?]+$/, '');
           if (!answer.includes(clean)) scored.push({ url: clean, score });
