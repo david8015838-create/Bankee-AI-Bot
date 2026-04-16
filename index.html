@@ -1808,14 +1808,27 @@ D. 處理圖片與截圖
   function requestGoogleAuth() {
     return new Promise((resolve, reject) => {
       try { initGisClient(); } catch(e) { reject(e); return; }
+      // Restore token from localStorage if still valid (survives page refresh)
+      if (!gDriveToken) {
+        const saved = localStorage.getItem('gauth_token');
+        const expiry = parseInt(localStorage.getItem('gauth_expiry') || '0', 10);
+        if (saved && Date.now() < expiry - 60000) {
+          gDriveToken = saved;
+          gTokenExpiry = expiry;
+        }
+      }
       if (gDriveToken && Date.now() < gTokenExpiry - 60000) { resolve(gDriveToken); return; }
       gTokenClient.callback = (resp) => {
         if (resp.error) { reject(new Error(resp.error_description || resp.error)); return; }
         gDriveToken = resp.access_token;
         gTokenExpiry = Date.now() + (resp.expires_in || 3600) * 1000;
+        // Persist so next page load skips re-auth
+        localStorage.setItem('gauth_token', gDriveToken);
+        localStorage.setItem('gauth_expiry', String(gTokenExpiry));
         resolve(gDriveToken);
       };
-      gTokenClient.requestAccessToken({ prompt: gDriveToken ? '' : 'consent' });
+      // prompt:'' = silent re-auth if already authorized; only shows popup on first-ever auth
+      gTokenClient.requestAccessToken({ prompt: '' });
     });
   }
 
