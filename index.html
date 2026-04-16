@@ -1594,14 +1594,18 @@ D. 處理圖片與截圖
     marked.use({
       renderer: {
         link(token) {
-          const href = token.href || '';
-          const title = token.title || '';
-          const rawText = (token.text || '').replace(/<[^>]+>/g, '').trim();
-          console.log('[link renderer] href=', href, 'rawText=', rawText, 'token=', JSON.stringify(token));
-          // If link text is a generic placeholder, show the actual URL instead
-          const isGeneric = /^(連結|link|here|點此|點擊|此處|查看|開啟|前往|點此開啟)$/i.test(rawText);
-          const displayText = isGeneric ? href : (token.text || href);
-          return '<a href="' + href + '" target="_blank" rel="noopener noreferrer"' + (title ? ' title="' + title + '"' : '') + '>' + displayText + '</a>';
+          // marked v9: token is a plain URL string for GFM autolinks,
+          // or an object {href, title, text} for standard [text](url) links.
+          const href  = typeof token === 'string' ? token : (token.href  || '');
+          const title = typeof token === 'string' ? ''    : (token.title || '');
+          const inner = typeof token === 'string' ? token : (token.text  || href);
+          const rawText = inner.replace(/<[^>]+>/g, '').trim();
+          // Show URL as display text when the label is a generic placeholder or same as URL
+          const isGeneric = !rawText || rawText === href ||
+            /^(連結|link|here|點此|點擊|此處|查看|開啟|前往|點此開啟)$/i.test(rawText);
+          const displayText = isGeneric ? href : inner;
+          return '<a href="' + href + '" target="_blank" rel="noopener noreferrer"' +
+            (title ? ' title="' + title + '"' : '') + '>' + displayText + '</a>';
         }
       }
     });
