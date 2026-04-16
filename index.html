@@ -2226,6 +2226,37 @@ D. 處理圖片與截圖
     return { answer, source, followups };
   }
 
+  // Gemini safety filters sometimes strip URLs from responses.
+  // If the answer mentions a link but contains no URL, inject URLs from the source file.
+  function injectMissingUrls(answer, sourceName) {
+    if (/https?:\/\//.test(answer)) return answer; // already has URLs
+
+    // Only inject if the answer implies there should be a link
+    if (!/連結|網址|開啟|前往|link/i.test(answer)) return answer;
+
+    const sourceFiles = getSourceFile(sourceName);
+    if (!sourceFiles || sourceFiles.length === 0) return answer;
+
+    const urlRegex = /https?:\/\/[^\s)）\]"'<>]+/g;
+    const seen = new Set();
+    const injected = [];
+
+    for (const file of sourceFiles) {
+      const matches = (file.content || '').match(urlRegex) || [];
+      for (const url of matches) {
+        const clean = url.replace(/[.,;:!?]+$/, ''); // strip trailing punctuation
+        if (!seen.has(clean)) {
+          seen.add(clean);
+          injected.push(`[${clean}](${clean})`);
+        }
+      }
+    }
+
+    if (injected.length === 0) return answer;
+
+    return answer + '\n\n**相關連結：**\n' + injected.map(u => `- ${u}`).join('\n');
+  }
+
   function normalize(s) {
     return s.toLowerCase().replace(/[\s\-_\.]/g, '');
   }
@@ -2470,7 +2501,8 @@ D. 處理圖片與截圖
         const rawResponse = await callAI(userMessage);
         console.log('🤖 Raw AI response:', rawResponse);
         removeTyping();
-        const { answer, source, followups } = parseResponse(rawResponse);
+        const { answer: rawAnswer, source, followups } = parseResponse(rawResponse);
+        const answer = injectMissingUrls(rawAnswer, source);
         conversationHistory.push({ role: 'assistant', content: answer });
         appendMessage('bot', answer, source, followups, userMessage);
         updateContextBar();
