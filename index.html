@@ -2343,6 +2343,9 @@ D. 處理圖片與截圖
       }
       if (currentUrls.length) sections.push({ header: currentHeader, urls: currentUrls });
     }
+    console.log('[URL inject] sections:', JSON.stringify(sections));
+    console.log('[URL inject] questionTokens:', [...questionTokens]);
+    console.log('[URL inject] answerTokens:', [...answerTokens]);
 
     // Score each section header: question token hit = length×5, answer token hit = length×1
     const scored = sections
@@ -2356,6 +2359,7 @@ D. 處理圖片與截圖
       })
       .filter(s => s.urls.length > 0);
 
+    console.log('[URL inject] scored:', JSON.stringify(scored));
     if (scored.length === 0) return answer;
     const maxScore = Math.max(...scored.map(r => r.score));
     if (maxScore === 0) return answer;
