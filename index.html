@@ -1933,9 +1933,8 @@ D. 處理圖片與截圖
         return;
       }
 
-      // Load files one by one (parallel triggers Google CORS block)
-      sopFiles = [];
-      for (const file of files) {
+      // Load files with concurrency=2 (fully parallel triggers CORS block; sequential is too slow)
+      async function loadOneFile(file) {
         for (let retry = 0; retry < 2; retry++) {
           try {
             let content = '';
@@ -1957,18 +1956,47 @@ D. 處理圖片與截圖
             console.log(`✅ ${cleanName} (${content.length} 字)`);
             const urls = content.match(/https?:\/\/[^\s)）\]]+/g);
             if (urls) console.log(`   🔗 ${urls.length} 個 URL:`, urls);
-            sopFiles.push({ ...file, name: cleanName, originalName: file.name, content });
-            break; // success, no retry
+            return { ...file, name: cleanName, originalName: file.name, content };
           } catch (e) {
             if (retry === 0) {
-              console.warn(`⚠ ${file.name} 第一次失敗，1 秒後重試...`, e.message);
-              await new Promise(r => setTimeout(r, 1000));
+              console.warn(`⚠ ${file.name} 第一次失敗，重試...`, e.message);
+              await new Promise(r => setTimeout(r, 800));
             } else {
               console.warn(`❌ 無法載入 ${file.name}:`, e.message);
+              return null;
             }
           }
         }
+        return null;
       }
+
+      // Concurrency limiter: max 2 concurrent fetches
+      sopFiles = [];
+      const CONCURRENCY = 2;
+      let fileIndex = 0;
+      const fileResults = new Array(files.length).fill(null);
+
+      await new Promise((resolve) => {
+        let active = 0;
+        let settled = 0;
+
+        function next() {
+          while (active < CONCURRENCY && fileIndex < files.length) {
+            const i = fileIndex++;
+            active++;
+            loadOneFile(files[i]).then(result => {
+              fileResults[i] = result;
+              active--;
+              settled++;
+              if (settled === files.length) resolve();
+              else next();
+            });
+          }
+        }
+        next();
+      });
+
+      sopFiles = fileResults.filter(Boolean);
 
       // All files active by default
       activeFileIds = new Set(sopFiles.map(f => f.id));
