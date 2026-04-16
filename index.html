@@ -2304,7 +2304,7 @@ D. 處理圖片與截圖
     if (missing.length === 0) return answer;
 
     console.log('💉 注入缺失 URL:', missing);
-    return answer + '\n\n**相關連結：**\n' + missing.map(u => `- [${u}](${u})`).join('\n');
+    return answer + '\n\n**相關連結：**\n' + missing.map(u => `- ${u}`).join('\n');
   }
 
   function normalize(s) {
