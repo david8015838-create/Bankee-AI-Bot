@@ -2295,16 +2295,15 @@ D. 處理圖片與截圖
       }
     }
 
-    console.log('🔍 injectMissingUrls — source:', sourceName, '| sourceFiles found:', sourceFiles.length, '| allUrls:', [...allUrls]);
-
     if (allUrls.size === 0) return answer;
 
     // Only add URLs that are not already present in the answer
     const missing = [...allUrls].filter(url => !answer.includes(url));
     if (missing.length === 0) return answer;
 
-    console.log('💉 注入缺失 URL:', missing);
-    return answer + '\n\n**相關連結：**\n' + missing.map(u => `- ${u}`).join('\n');
+    // Use HTML anchor tags directly to avoid marked.js rendering issues
+    const linkHtml = missing.map(u => `<a href="${u}" target="_blank" rel="noopener noreferrer">${u}</a>`).join('<br>');
+    return answer + '\n\n**相關連結：**\n\n' + linkHtml;
   }
 
   function normalize(s) {
