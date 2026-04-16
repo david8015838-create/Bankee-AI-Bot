@@ -2283,31 +2283,35 @@ D. 處理圖片與截圖
     return { answer, source, followups };
   }
 
-  // Find URLs from source files that are contextually near text matching the user's question.
-  // This avoids injecting irrelevant URLs from the same document.
+  // Find URLs from source files contextually relevant to the user's question.
   function injectMissingUrls(answer, sourceName, userQuestion) {
     const sourceFiles = getSourceFile(sourceName);
     if (!sourceFiles || sourceFiles.length === 0) return answer;
 
     const urlRegex = /https?:\/\/[^\s)）\]"'<>]+/g;
-    const questionWords = (userQuestion || '').toLowerCase()
-      .replace(/[？?。，、！!]/g, '').split('').filter(c => c.trim());
-    const questionStr = questionWords.join('');
+
+    // Extract meaningful tokens: English words/numbers OR individual Chinese chars
+    const tokens = (userQuestion || '').toLowerCase().match(/[a-z0-9]+|[\u4e00-\u9fff]/g) || [];
 
     const relevant = [];
 
     for (const file of sourceFiles) {
-      const content = file.content || '';
-      const lines = content.split('\n');
+      const lines = (file.content || '').split('\n');
 
       lines.forEach((line, idx) => {
         const urls = line.match(urlRegex);
         if (!urls) return;
-        // Get surrounding context (±6 lines)
-        const ctx = lines.slice(Math.max(0, idx - 6), idx + 6).join(' ').toLowerCase();
-        const ctxCompact = ctx.replace(/\s/g, '');
-        // Score: how many question characters appear in context
-        const score = questionStr.split('').filter(c => ctxCompact.includes(c)).length;
+
+        // Context = lines AROUND the URL, excluding the URL line itself
+        const ctxLines = [
+          ...lines.slice(Math.max(0, idx - 6), idx),
+          ...lines.slice(idx + 1, Math.min(lines.length, idx + 6))
+        ];
+        const ctx = ctxLines.join(' ').toLowerCase();
+
+        // Score = how many question tokens appear in surrounding text
+        const score = tokens.filter(t => ctx.includes(t)).length;
+
         urls.forEach(url => {
           const clean = url.replace(/[.,;:!?]+$/, '');
           if (!answer.includes(clean)) {
@@ -2319,12 +2323,9 @@ D. 處理圖片與截圖
 
     if (relevant.length === 0) return answer;
 
-    // Only inject URLs with the highest relevance score (skip irrelevant ones)
+    // Only inject URLs that scored the highest (strict: exact max only)
     const maxScore = Math.max(...relevant.map(r => r.score));
-    const threshold = Math.max(maxScore * 0.6, 1);
-    const toInject = [...new Set(
-      relevant.filter(r => r.score >= threshold).map(r => r.url)
-    )];
+    const toInject = [...new Set(relevant.filter(r => r.score === maxScore).map(r => r.url))];
 
     if (toInject.length === 0) return answer;
 
