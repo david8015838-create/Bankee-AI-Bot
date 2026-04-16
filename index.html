@@ -2283,28 +2283,52 @@ D. 處理圖片與截圖
     return { answer, source, followups };
   }
 
-  // Gemini safety filters strip URLs. Always inject any URLs from source files not already in the answer.
-  function injectMissingUrls(answer, sourceName) {
+  // Find URLs from source files that are contextually near text matching the user's question.
+  // This avoids injecting irrelevant URLs from the same document.
+  function injectMissingUrls(answer, sourceName, userQuestion) {
     const sourceFiles = getSourceFile(sourceName);
     if (!sourceFiles || sourceFiles.length === 0) return answer;
 
     const urlRegex = /https?:\/\/[^\s)）\]"'<>]+/g;
-    const allUrls = new Set();
+    const questionWords = (userQuestion || '').toLowerCase()
+      .replace(/[？?。，、！!]/g, '').split('').filter(c => c.trim());
+    const questionStr = questionWords.join('');
+
+    const relevant = [];
 
     for (const file of sourceFiles) {
-      const matches = (file.content || '').match(urlRegex) || [];
-      for (const url of matches) {
-        allUrls.add(url.replace(/[.,;:!?]+$/, ''));
-      }
+      const content = file.content || '';
+      const lines = content.split('\n');
+
+      lines.forEach((line, idx) => {
+        const urls = line.match(urlRegex);
+        if (!urls) return;
+        // Get surrounding context (±6 lines)
+        const ctx = lines.slice(Math.max(0, idx - 6), idx + 6).join(' ').toLowerCase();
+        const ctxCompact = ctx.replace(/\s/g, '');
+        // Score: how many question characters appear in context
+        const score = questionStr.split('').filter(c => ctxCompact.includes(c)).length;
+        urls.forEach(url => {
+          const clean = url.replace(/[.,;:!?]+$/, '');
+          if (!answer.includes(clean)) {
+            relevant.push({ url: clean, score });
+          }
+        });
+      });
     }
 
-    if (allUrls.size === 0) return answer;
+    if (relevant.length === 0) return answer;
 
-    // Only inject URLs not already referenced in the answer (as plain text or inside markdown links)
-    const missing = [...allUrls].filter(url => !answer.includes(url));
-    if (missing.length === 0) return answer;
+    // Only inject URLs with the highest relevance score (skip irrelevant ones)
+    const maxScore = Math.max(...relevant.map(r => r.score));
+    const threshold = Math.max(maxScore * 0.6, 1);
+    const toInject = [...new Set(
+      relevant.filter(r => r.score >= threshold).map(r => r.url)
+    )];
 
-    const linkHtml = missing.map(u =>
+    if (toInject.length === 0) return answer;
+
+    const linkHtml = toInject.map(u =>
       `<a href="${u}" target="_blank" rel="noopener noreferrer">${u}</a>`
     ).join('<br>');
     return answer + '\n\n**相關連結：**\n\n' + linkHtml;
@@ -2555,7 +2579,7 @@ D. 處理圖片與截圖
         console.log('🤖 Raw AI response:', rawResponse);
         removeTyping();
         const { answer: rawAnswer, source, followups } = parseResponse(rawResponse);
-        const answer = injectMissingUrls(rawAnswer, source);
+        const answer = injectMissingUrls(rawAnswer, source, userMessage);
         conversationHistory.push({ role: 'assistant', content: answer });
         appendMessage('bot', answer, source, followups, userMessage);
         updateContextBar();
