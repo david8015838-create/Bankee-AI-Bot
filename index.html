@@ -2283,56 +2283,28 @@ D. 處理圖片與截圖
     return { answer, source, followups };
   }
 
-  // Find URLs from source files contextually relevant to the user's question.
+  // Inject missing URLs: only when there is exactly 1 URL in the source file (no ambiguity).
+  // For files with multiple URLs, the AI's own markdown links handle display via the link renderer.
   function injectMissingUrls(answer, sourceName, userQuestion) {
     const sourceFiles = getSourceFile(sourceName);
     if (!sourceFiles || sourceFiles.length === 0) return answer;
 
     const urlRegex = /https?:\/\/[^\s)）\]"'<>]+/g;
-
-    // Extract meaningful tokens: English words/numbers OR individual Chinese chars
-    const tokens = (userQuestion || '').toLowerCase().match(/[a-z0-9]+|[\u4e00-\u9fff]/g) || [];
-
-    const relevant = [];
+    const allUrls = new Set();
 
     for (const file of sourceFiles) {
-      const lines = (file.content || '').split('\n');
-
-      lines.forEach((line, idx) => {
-        const urls = line.match(urlRegex);
-        if (!urls) return;
-
-        // Context = lines AROUND the URL, excluding the URL line itself
-        const ctxLines = [
-          ...lines.slice(Math.max(0, idx - 6), idx),
-          ...lines.slice(idx + 1, Math.min(lines.length, idx + 6))
-        ];
-        const ctx = ctxLines.join(' ').toLowerCase();
-
-        // Score = how many question tokens appear in surrounding text
-        const score = tokens.filter(t => ctx.includes(t)).length;
-
-        urls.forEach(url => {
-          const clean = url.replace(/[.,;:!?]+$/, '');
-          if (!answer.includes(clean)) {
-            relevant.push({ url: clean, score });
-          }
-        });
-      });
+      const matches = (file.content || '').match(urlRegex) || [];
+      matches.forEach(u => allUrls.add(u.replace(/[.,;:!?]+$/, '')));
     }
 
-    if (relevant.length === 0) return answer;
+    // Only inject when there is exactly 1 URL — no risk of showing the wrong one
+    if (allUrls.size !== 1) return answer;
 
-    // Only inject URLs that scored the highest (strict: exact max only)
-    const maxScore = Math.max(...relevant.map(r => r.score));
-    const toInject = [...new Set(relevant.filter(r => r.score === maxScore).map(r => r.url))];
+    const [url] = allUrls;
+    if (answer.includes(url)) return answer; // already present
 
-    if (toInject.length === 0) return answer;
-
-    const linkHtml = toInject.map(u =>
-      `<a href="${u}" target="_blank" rel="noopener noreferrer">${u}</a>`
-    ).join('<br>');
-    return answer + '\n\n**相關連結：**\n\n' + linkHtml;
+    return answer +
+      `\n\n**相關連結：**\n\n<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`;
   }
 
   function normalize(s) {
