@@ -1596,8 +1596,11 @@ D. 處理圖片與截圖
         link(token) {
           const href = token.href || '';
           const title = token.title || '';
-          const text = token.text || '';
-          return '<a href="' + href + '" target="_blank" rel="noopener noreferrer"' + (title ? ' title="' + title + '"' : '') + '>' + text + '</a>';
+          const rawText = (token.text || '').replace(/<[^>]+>/g, '').trim();
+          // If link text is a generic placeholder, show the actual URL instead
+          const isGeneric = /^(連結|link|here|點此|點擊|此處|查看|開啟|前往)$/i.test(rawText);
+          const displayText = isGeneric ? href : (token.text || href);
+          return '<a href="' + href + '" target="_blank" rel="noopener noreferrer"' + (title ? ' title="' + title + '"' : '') + '>' + displayText + '</a>';
         }
       }
     });
@@ -2297,8 +2300,11 @@ D. 處理圖片與截圖
 
     if (allUrls.size === 0) return answer;
 
-    // Always show all source-file URLs explicitly so users can see and click them
-    const linkHtml = [...allUrls].map(u =>
+    // Only inject URLs not already referenced in the answer (as plain text or inside markdown links)
+    const missing = [...allUrls].filter(url => !answer.includes(url));
+    if (missing.length === 0) return answer;
+
+    const linkHtml = missing.map(u =>
       `<a href="${u}" target="_blank" rel="noopener noreferrer">${u}</a>`
     ).join('<br>');
     return answer + '\n\n**相關連結：**\n\n' + linkHtml;
