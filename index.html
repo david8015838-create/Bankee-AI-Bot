@@ -1933,8 +1933,37 @@ D. 處理圖片與截圖
         return;
       }
 
-      // Load files with concurrency=2 (fully parallel triggers CORS block; sequential is too slow)
-      async function loadOneFile(file) {
+      // File content cache (localStorage, 30-min TTL) — avoids slow sequential re-download on every refresh
+      const FILE_CACHE_KEY = 'sop_file_cache_v1';
+      const FILE_CACHE_TTL = 30 * 60 * 1000;
+
+      function readFileCache() {
+        try { return JSON.parse(localStorage.getItem(FILE_CACHE_KEY) || '{}'); } catch(e) { return {}; }
+      }
+      function writeFileCache(cache) {
+        try { localStorage.setItem(FILE_CACHE_KEY, JSON.stringify(cache)); } catch(e) {}
+      }
+
+      const fileCache = readFileCache();
+      sopFiles = [];
+      let loadedCount = 0;
+
+      // Sequential (1 at a time) to avoid Google CORS block; cache makes subsequent loads instant
+      for (const file of files) {
+        const cleanName = file.name.replace(/\.[^.]+$/, '');
+
+        // Use cache if fresh
+        const cached = fileCache[file.id];
+        if (cached && (Date.now() - cached.ts < FILE_CACHE_TTL)) {
+          console.log(`📦 ${cleanName} (快取)`);
+          sopFiles.push({ ...file, name: cleanName, originalName: file.name, content: cached.content });
+          loadedCount++;
+          statusEl.textContent = `載入中 ${loadedCount}/${files.length}...`;
+          continue;
+        }
+
+        // Fetch from Drive (with 1 retry)
+        let loaded = false;
         for (let retry = 0; retry < 2; retry++) {
           try {
             let content = '';
@@ -1952,51 +1981,32 @@ D. 處理圖片與截圖
               if (!res.ok) throw new Error(`HTTP ${res.status}`);
               content = await res.text();
             }
-            const cleanName = file.name.replace(/\.[^.]+$/, '');
+            fileCache[file.id] = { content, ts: Date.now() };
+            writeFileCache(fileCache);
             console.log(`✅ ${cleanName} (${content.length} 字)`);
-            const urls = content.match(/https?:\/\/[^\s)）\]]+/g);
-            if (urls) console.log(`   🔗 ${urls.length} 個 URL:`, urls);
-            return { ...file, name: cleanName, originalName: file.name, content };
+            sopFiles.push({ ...file, name: cleanName, originalName: file.name, content });
+            loadedCount++;
+            statusEl.textContent = `載入中 ${loadedCount}/${files.length}...`;
+            loaded = true;
+            break;
           } catch (e) {
             if (retry === 0) {
               console.warn(`⚠ ${file.name} 第一次失敗，重試...`, e.message);
               await new Promise(r => setTimeout(r, 800));
             } else {
-              console.warn(`❌ 無法載入 ${file.name}:`, e.message);
-              return null;
+              // Fallback to expired cache if available
+              if (cached) {
+                console.warn(`⚠ ${cleanName} 使用過期快取`);
+                sopFiles.push({ ...file, name: cleanName, originalName: file.name, content: cached.content });
+                loadedCount++;
+                statusEl.textContent = `載入中 ${loadedCount}/${files.length}...`;
+              } else {
+                console.warn(`❌ 無法載入 ${file.name}:`, e.message);
+              }
             }
           }
         }
-        return null;
       }
-
-      // Concurrency limiter: max 2 concurrent fetches
-      sopFiles = [];
-      const CONCURRENCY = 2;
-      let fileIndex = 0;
-      const fileResults = new Array(files.length).fill(null);
-
-      await new Promise((resolve) => {
-        let active = 0;
-        let settled = 0;
-
-        function next() {
-          while (active < CONCURRENCY && fileIndex < files.length) {
-            const i = fileIndex++;
-            active++;
-            loadOneFile(files[i]).then(result => {
-              fileResults[i] = result;
-              active--;
-              settled++;
-              if (settled === files.length) resolve();
-              else next();
-            });
-          }
-        }
-        next();
-      });
-
-      sopFiles = fileResults.filter(Boolean);
 
       // All files active by default
       activeFileIds = new Set(sopFiles.map(f => f.id));
