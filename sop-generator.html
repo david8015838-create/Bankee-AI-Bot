@@ -305,6 +305,26 @@ body {
 /* ── Info-ref category tag ── */
 .cat-select { max-width: 200px; }
 
+/* ── AI Quick Create ── */
+.ai-warning {
+  background: #fff7ed; border: 1px solid #fed7aa; border-radius: 10px;
+  padding: 12px 16px; margin-bottom: 24px; font-size: 13px; color: #92400e;
+  display: flex; gap: 10px; line-height: 1.6;
+}
+.ai-warning strong { font-weight: 600; }
+.question-num {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 50%; background: #4f8ef7;
+  color: #fff; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 2px;
+}
+.question-item { display: flex; flex-direction: column; gap: 8px; }
+.question-label { font-size: 14px; font-weight: 600; color: #1a202c; display: flex; gap: 8px; align-items: flex-start; }
+.questions-list { display: flex; flex-direction: column; gap: 20px; }
+.tag.warn { background: #fff7ed; color: #c05621; border: 1px solid #fed7aa; }
+.btn-back { padding: 9px 16px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; color: #6b7280; font-size: 13px; cursor: pointer; font-family: inherit; transition: background 0.15s; }
+.btn-back:hover { background: #f3f4f6; }
+.inline-spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #e5e7eb; border-top-color: #4f8ef7; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 6px; }
+
 @media (max-width: 600px) {
   .form-grid { grid-template-columns: 1fr; }
   .type-cards { flex-direction: column; align-items: center; }
@@ -366,10 +386,12 @@ const SOP_STEPS = ['基本資訊', '適用對象', '前置準備', '標準步驟
 const REF_STEPS = ['基本資訊', '資訊內容', 'FAQ', '完成'];
 
 // ── State ──────────────────────────────────────────────────
-let docType = null; // 'sop' | 'ref'
+let docType = null; // 'sop' | 'ref' | 'ai'
 let currentStep = 0;
 let sopData = {};
 let refData = {};
+let aiData = { topic: '', questions: [], answers: [], generatedMd: '' };
+let aiStep = 0; // 0=topic input, 1=questions, 2=complete
 let oauthToken = null;
 let gisInited = false;
 let tokenClient = null;
@@ -446,6 +468,19 @@ function render() {
     return;
   }
 
+  // AI Quick Create — separate flow
+  if (docType === 'ai') {
+    if (aiStep === 2) {
+      root.appendChild(renderComplete());
+    } else {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = aiStep === 0 ? renderAiTopicStep() : renderAiQuestionsStep();
+      root.appendChild(card);
+    }
+    return;
+  }
+
   const steps = docType === 'sop' ? SOP_STEPS : REF_STEPS;
   const lastStep = steps.length - 1;
 
@@ -514,6 +549,12 @@ function renderTypeSelect() {
         <p>「某資料去哪找」「某東西怎麼取得」「某系統帳號申請」等純資訊類文件</p>
         <div class="tag">3 大區塊 · 輕量快速</div>
       </div>
+      <div class="type-card" onclick="selectDocType('ai')">
+        <div class="icon">🤖</div>
+        <h3>AI 快速建立</h3>
+        <p>描述主題，AI 提問釐清細節，自動生成文件。省去逐一填表步驟。</p>
+        <div class="tag warn">⚠️ 不適合複雜多步驟流程</div>
+      </div>
     </div>`;
   wrap.appendChild(page);
   return wrap;
@@ -524,6 +565,10 @@ function selectDocType(type) {
   currentStep = 0;
   sopData = {};
   refData = {};
+  if (type === 'ai') {
+    aiData = { topic: '', questions: [], answers: [], generatedMd: '' };
+    aiStep = 0;
+  }
   render();
 }
 
@@ -894,7 +939,11 @@ function renderRefStep2() {
 function renderComplete() {
   const wrap = document.createElement('div');
   wrap.className = 'card';
-  const title = docType === 'sop' ? (sopData.step0?.title || 'SOP文件') : (refData.step0?.title || '資訊參考');
+  const title = docType === 'ai'
+    ? (aiData.topic.slice(0, 30) || 'AI文件')
+    : docType === 'sop'
+      ? (sopData.step0?.title || 'SOP文件')
+      : (refData.step0?.title || '資訊參考');
   const safeTitle = title.replace(/\s+/g, '-').replace(/[^\w\u4e00-\u9fff\-]/g, '');
   const mdContent = generateMd();
 
@@ -1305,8 +1354,136 @@ async function callOpenAI(apiKey, model, sysMsg, userMsg) {
   return data.choices?.[0]?.message?.content || '';
 }
 
+// ── AI Quick Create ────────────────────────────────────────
+function renderAiTopicStep() {
+  return `
+    <div class="card-title">🤖 AI 快速建立</div>
+    <div class="ai-warning">
+      <span>⚠️</span>
+      <div><strong>適用範圍：</strong>簡單的資訊查詢、系統介紹、帳號申請說明等一兩句話就能描述清楚的內容。<br>
+      <strong>不適合：</strong>複雜的多步驟業務流程 — 請改用「📋 完整 SOP」表單，AI 自動生成的細節精準度較低。</div>
+    </div>
+    <div class="form-group">
+      <label>你想記錄什麼？</label>
+      <div class="form-hint">用一兩句話描述，例如：「eHRD 是什麼、在哪裡開啟」、「公司信箱的申請和使用方式」</div>
+      <textarea id="aiTopicInput" class="form-input" rows="3" placeholder="例如：差旅費請款的申請流程和注意事項">${esc(aiData.topic)}</textarea>
+    </div>
+    <div style="margin-top:20px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+      <button class="btn-primary" onclick="submitTopic()" id="submitTopicBtn">讓 AI 開始提問 →</button>
+      <button class="btn-back" onclick="docType=null;render()">← 重新選擇類型</button>
+    </div>
+    <div id="topicLoading" style="display:none;margin-top:14px;color:#6b7280;font-size:13px;">
+      <span class="inline-spinner"></span>AI 正在生成問題...
+    </div>`;
+}
+
+function renderAiQuestionsStep() {
+  const qItems = aiData.questions.map((q, i) => `
+    <div class="question-item">
+      <div class="question-label">
+        <span class="question-num">${i + 1}</span>
+        <span>${esc(q)}</span>
+      </div>
+      <textarea class="form-input" id="aiAns_${i}" rows="2" placeholder="請填寫你的回答...">${esc(aiData.answers[i] || '')}</textarea>
+    </div>`).join('');
+
+  return `
+    <div class="card-title">AI 的問題</div>
+    <div class="card-subtitle">請盡量完整回答，AI 會根據這些答案生成文件</div>
+    <div class="ai-warning" style="margin-top:16px;">
+      <span>⚠️</span>
+      <span>如果主題比想像中複雜，建議改用<strong>「📋 完整 SOP」</strong>表單，以確保每個步驟都精準</span>
+    </div>
+    <div class="questions-list">${qItems}</div>
+    <div style="margin-top:24px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+      <button class="btn-primary" onclick="generateFromAnswers()" id="generateBtn">生成文件 →</button>
+      <button class="btn-back" onclick="aiStep=0;render()">← 重新描述主題</button>
+    </div>
+    <div id="genLoading" style="display:none;margin-top:14px;color:#6b7280;font-size:13px;">
+      <span class="inline-spinner"></span>AI 正在生成文件...
+    </div>`;
+}
+
+async function submitTopic() {
+  const topic = (document.getElementById('aiTopicInput')?.value || '').trim();
+  if (!topic) { toast('⚠️ 請先描述要記錄的內容'); return; }
+  aiData.topic = topic;
+
+  const btn = document.getElementById('submitTopicBtn');
+  const loading = document.getElementById('topicLoading');
+  btn.disabled = true;
+  loading.style.display = 'block';
+
+  try {
+    const { provider, model, apiKey } = loadSettings();
+    if (!apiKey) { toast('⚠️ 請先設定 API Key（右上角 ⚙️）'); btn.disabled = false; loading.style.display = 'none'; return; }
+
+    const sysMsg = '你是一個工作文件助手。根據使用者描述的主題，生成 5-8 個問題來收集足夠資訊以撰寫一份完整的工作說明文件。問題要涵蓋：這是什麼/用途、誰來使用、怎麼操作/步驟、注意事項、常見問題。輸出純 JSON 陣列，只有問題字串，不加說明，例：["問題1","問題2"]';
+    const userMsg = `使用者想記錄的主題：「${topic}」\n\n請生成問題（JSON 陣列）：`;
+
+    let raw = provider === 'gemini'
+      ? await callGemini(apiKey, model, sysMsg, userMsg)
+      : await callOpenAI(apiKey, model, sysMsg, userMsg);
+
+    const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    const questions = JSON.parse(cleaned);
+    if (!Array.isArray(questions) || !questions.length) throw new Error('無法解析問題列表');
+
+    aiData.questions = questions;
+    aiData.answers = new Array(questions.length).fill('');
+    aiStep = 1;
+    render();
+  } catch(e) {
+    toast('❌ 生成問題失敗：' + (e.message || e));
+    btn.disabled = false;
+    loading.style.display = 'none';
+  }
+}
+
+async function generateFromAnswers() {
+  const answers = aiData.questions.map((_, i) => (document.getElementById(`aiAns_${i}`)?.value || '').trim());
+  aiData.answers = answers;
+
+  const btn = document.getElementById('generateBtn');
+  const loading = document.getElementById('genLoading');
+  btn.disabled = true;
+  loading.style.display = 'block';
+
+  try {
+    const { provider, model, apiKey } = loadSettings();
+    if (!apiKey) { toast('⚠️ 請先設定 API Key（右上角 ⚙️）'); btn.disabled = false; loading.style.display = 'none'; return; }
+
+    const qaStr = aiData.questions.map((q, i) => `Q${i+1}：${q}\nA${i+1}：${answers[i] || '（未填寫）'}`).join('\n\n');
+
+    const sysMsg = `你是 SOP 文件撰寫專家。根據使用者提供的主題和問答，生成一份完整、可直接使用的 Markdown 工作文件。
+結構（依內容決定用步驟流程或資訊介紹）：
+# {標題}
+## 一句話說明
+## 適用對象
+## 主要內容（步驟流程 or 資訊內容）
+## 常見問題 FAQ（至少 4 個，格式：**Q：問題**\nA：答案）
+## 維護資訊（最後更新日期）
+只輸出 Markdown 內容，不加前言說明。`;
+
+    const userMsg = `主題：「${aiData.topic}」\n\n問答資料：\n${qaStr}`;
+
+    const md = provider === 'gemini'
+      ? await callGemini(apiKey, model, sysMsg, userMsg)
+      : await callOpenAI(apiKey, model, sysMsg, userMsg);
+
+    aiData.generatedMd = md;
+    aiStep = 2;
+    render();
+  } catch(e) {
+    toast('❌ 生成文件失敗：' + (e.message || e));
+    btn.disabled = false;
+    loading.style.display = 'none';
+  }
+}
+
 // ── MD Generation ──────────────────────────────────────────
 function generateMd() {
+  if (docType === 'ai') return aiData.generatedMd || '';
   return docType === 'sop' ? generateSopMd() : generateRefMd();
 }
 
