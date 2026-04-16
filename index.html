@@ -2299,7 +2299,9 @@ D. 處理圖片與截圖
   // Inject missing URLs from source file.
   // For single-URL files: always inject. For multi-URL files: match by answer content keywords.
   function injectMissingUrls(answer, sourceName, userQuestion) {
+    console.log('[URL inject] called, sourceName=', sourceName);
     const sourceFiles = getSourceFile(sourceName);
+    console.log('[URL inject] sourceFiles=', sourceFiles ? sourceFiles.length : 'null');
     if (!sourceFiles || sourceFiles.length === 0) return answer;
 
     const urlRegex = /https?:\/\/[^\s)）\]"'<>]+/g;
@@ -2309,11 +2311,13 @@ D. 處理圖片與截圖
     for (const file of sourceFiles) {
       (file.content || '').match(urlRegex)?.forEach(u => allUrls.add(u.replace(/[.,;:!?]+$/, '')));
     }
+    console.log('[URL inject] allUrls=', [...allUrls]);
     if (allUrls.size === 0) return answer;
 
     // If only 1 URL, inject directly (no ambiguity)
     if (allUrls.size === 1) {
       const [url] = allUrls;
+      console.log('[URL inject] single URL, answer includes?', answer.includes(url));
       if (answer.includes(url)) return answer;
       return answer + `\n\n**相關連結：**\n\n<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`;
     }
