@@ -1948,7 +1948,38 @@ D. 處理圖片與截圖
       sopFiles = [];
       let loadedCount = 0;
 
-      // Sequential (1 at a time) to avoid Google CORS block; cache makes subsequent loads instant
+      // Check how many files need fresh download (not in cache)
+      const needDownload = files.filter(f => {
+        const c = fileCache[f.id];
+        return !c || (Date.now() - c.ts >= FILE_CACHE_TTL);
+      });
+
+      // Get OAuth token if any file needs to be downloaded
+      let oauthTokenForLoad = null;
+      if (needDownload.length > 0) {
+        const clientId = getOAuthClientId();
+        if (!clientId) {
+          statusEl.textContent = '⚠ 需要 OAuth Client ID';
+          statusEl.className = 'sop-status error';
+          document.getElementById('filesPickerList').innerHTML =
+            '<p style="font-size:13px;color:#f87171;padding:12px;text-align:center;">請先在 ⚙️ 設定中填入 Google OAuth Client ID，才能載入文件</p>';
+          return;
+        }
+        statusEl.textContent = '請登入 Google 以載入文件...';
+        try {
+          oauthTokenForLoad = await requestGoogleAuth();
+        } catch(e) {
+          // If OAuth fails but all files have expired cache, use it anyway
+          const allHaveCache = files.every(f => fileCache[f.id]);
+          if (!allHaveCache) {
+            statusEl.textContent = '⚠ 登入取消，部分文件無法載入';
+            statusEl.className = 'sop-status error';
+          }
+        }
+        statusEl.textContent = `載入中 0/${files.length}...`;
+      }
+
+      // Load each file: cache first, then OAuth download
       for (const file of files) {
         const cleanName = file.name.replace(/\.[^.]+$/, '');
 
@@ -1962,21 +1993,36 @@ D. 處理圖片與截圖
           continue;
         }
 
-        // Fetch from Drive (with 1 retry)
-        let loaded = false;
+        // No fresh cache — need OAuth token to download
+        if (!oauthTokenForLoad) {
+          if (cached) {
+            console.warn(`⚠ ${cleanName} 使用過期快取（無 OAuth token）`);
+            sopFiles.push({ ...file, name: cleanName, originalName: file.name, content: cached.content });
+            loadedCount++;
+            statusEl.textContent = `載入中 ${loadedCount}/${files.length}...`;
+          } else {
+            console.warn(`❌ 跳過 ${file.name}（無快取且無 OAuth token）`);
+          }
+          continue;
+        }
+
+        // Fetch with OAuth token (no CORS restriction, no API key rate limit)
         for (let retry = 0; retry < 2; retry++) {
           try {
             let content = '';
+            const headers = { Authorization: `Bearer ${oauthTokenForLoad}` };
             if (file.mimeType === 'application/vnd.google-apps.document') {
               const res = await fetch(
-                `https://www.googleapis.com/drive/v3/files/${file.id}/export?mimeType=text%2Fhtml&key=${DRIVE_API_KEY}`
+                `https://www.googleapis.com/drive/v3/files/${file.id}/export?mimeType=text%2Fhtml`,
+                { headers }
               );
               if (!res.ok) throw new Error(`HTTP ${res.status}`);
               const html = await res.text();
               content = googleDocHtmlToText(html);
             } else {
               const res = await fetch(
-                `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media&key=${DRIVE_API_KEY}`
+                `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`,
+                { headers }
               );
               if (!res.ok) throw new Error(`HTTP ${res.status}`);
               content = await res.text();
@@ -1987,14 +2033,12 @@ D. 處理圖片與截圖
             sopFiles.push({ ...file, name: cleanName, originalName: file.name, content });
             loadedCount++;
             statusEl.textContent = `載入中 ${loadedCount}/${files.length}...`;
-            loaded = true;
             break;
           } catch (e) {
             if (retry === 0) {
               console.warn(`⚠ ${file.name} 第一次失敗，重試...`, e.message);
-              await new Promise(r => setTimeout(r, 800));
+              await new Promise(r => setTimeout(r, 600));
             } else {
-              // Fallback to expired cache if available
               if (cached) {
                 console.warn(`⚠ ${cleanName} 使用過期快取`);
                 sopFiles.push({ ...file, name: cleanName, originalName: file.name, content: cached.content });
