@@ -797,6 +797,9 @@
        class="settings-btn" style="display:block;text-align:center;text-decoration:none;margin-bottom:8px;">
       🛠️ SOP 文件生成器
     </a>
+    <button class="settings-btn" onclick="refreshFiles()" style="margin-bottom:8px;">
+      🔄 重新整理文件
+    </button>
     <button class="settings-btn" onclick="openSettings()">
       ⚙️ API 設定
     </button>
@@ -1492,6 +1495,13 @@
     } finally {
       saveBtn.disabled = false;
     }
+  }
+
+  function refreshFiles() {
+    localStorage.removeItem('sop_file_cache_v1');
+    const statusEl = document.getElementById('sopStatus');
+    if (statusEl) { statusEl.textContent = '快取已清除，重新載入中...'; statusEl.className = 'sop-status'; }
+    loadSopFiles();
   }
 
   function openSettings() {
