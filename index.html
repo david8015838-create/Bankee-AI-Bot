@@ -1794,8 +1794,8 @@
   // ═══════════════════════════════════════
   // AI CALLS
   // ═══════════════════════════════════════
-  function isQuotaError(msg) {
-    return /429|quota|RESOURCE_EXHAUSTED|rate.?limit|too many/i.test(msg);
+  function isRetryableError(msg) {
+    return /429|503|quota|RESOURCE_EXHAUSTED|rate.?limit|too many|overload|capacity|unavailable|high demand/i.test(msg);
   }
 
   async function callAI(userMessage) {
@@ -1806,28 +1806,36 @@
     const context = buildContext();
     const systemPrompt = SYSTEM_PROMPT.replace('{context}', context);
 
+    // Build fallback model list: selected model first, then the rest
+    const allModels = MODELS[provider] || [model];
+    const modelList = [model, ...allModels.filter(m => m !== model)];
+
     let lastError;
-    for (let attempt = 0; attempt < keys.length; attempt++) {
-      const idx = (currentKeyIndex + attempt) % keys.length;
-      const apiKey = keys[idx];
-      try {
-        let result;
-        if (provider === 'gemini') result = await callGemini(apiKey, model, systemPrompt, userMessage);
-        else if (provider === 'openai') result = await callOpenAI(apiKey, model, systemPrompt, userMessage);
-        else throw new Error('未知的 AI 提供商');
-        currentKeyIndex = idx; // remember the working key
-        return result;
-      } catch (e) {
-        lastError = e;
-        if (isQuotaError(e.message) && attempt < keys.length - 1) {
-          // rotate to next key and retry
-          currentKeyIndex = (idx + 1) % keys.length;
-          continue;
+    // Try each model in order; for each model try all keys
+    for (let mi = 0; mi < modelList.length; mi++) {
+      const currentModel = modelList[mi];
+      for (let attempt = 0; attempt < keys.length; attempt++) {
+        const idx = (currentKeyIndex + attempt) % keys.length;
+        const apiKey = keys[idx];
+        try {
+          let result;
+          if (provider === 'gemini') result = await callGemini(apiKey, currentModel, systemPrompt, userMessage);
+          else if (provider === 'openai') result = await callOpenAI(apiKey, currentModel, systemPrompt, userMessage);
+          else throw new Error('未知的 AI 提供商');
+          currentKeyIndex = idx;
+          return result;
+        } catch (e) {
+          lastError = e;
+          if (isRetryableError(e.message)) {
+            currentKeyIndex = (idx + 1) % keys.length;
+            continue; // try next key
+          }
+          throw e; // non-retryable error, give up immediately
         }
-        throw e;
       }
+      // All keys failed for this model, try next model
     }
-    throw new Error(`所有 ${keys.length} 組 API Key 均已達額度上限，請明天再試或新增更多 Key`);
+    throw new Error(`所有模型與 API Key 均無法使用，請稍後再試（${lastError?.message || ''}）`);
   }
 
   async function callGemini(apiKey, model, systemPrompt, userMessage, historyOverride) {
@@ -2197,10 +2205,26 @@
         const keys = getApiKeys();
         const { provider, model } = loadSettings();
         const sysPrompt = '你是一個智慧助理，可以自由回答各種問題。回答一律使用繁體中文。';
-        const apiKey = keys[currentKeyIndex % keys.length];
+        const allModels = MODELS[provider] || [model];
+        const modelList = [model, ...allModels.filter(m => m !== model)];
         let result;
-        if (provider === 'gemini') result = await callGemini(apiKey, model, sysPrompt, userMessage, freeChatHistory.slice(0, -1));
-        else result = await callOpenAI(apiKey, model, sysPrompt, userMessage, freeChatHistory.slice(0, -1));
+        let lastErr;
+        outer: for (const currentModel of modelList) {
+          for (let attempt = 0; attempt < keys.length; attempt++) {
+            const idx = (currentKeyIndex + attempt) % keys.length;
+            try {
+              if (provider === 'gemini') result = await callGemini(keys[idx], currentModel, sysPrompt, userMessage, freeChatHistory.slice(0, -1));
+              else result = await callOpenAI(keys[idx], currentModel, sysPrompt, userMessage, freeChatHistory.slice(0, -1));
+              currentKeyIndex = idx;
+              break outer;
+            } catch(e) {
+              lastErr = e;
+              if (isRetryableError(e.message)) { currentKeyIndex = (idx + 1) % keys.length; continue; }
+              throw e;
+            }
+          }
+        }
+        if (result === undefined) throw lastErr;
         freeChatHistory.push({ role: 'assistant', content: result });
         removeTyping();
         appendMessage('bot', result, null, [], userMessage);
