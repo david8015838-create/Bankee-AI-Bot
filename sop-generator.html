@@ -1683,10 +1683,12 @@ function downloadMd() {
 }
 
 // ── Google Drive Upload ────────────────────────────────────
+const DEFAULT_OAUTH_CLIENT_ID = '996786285425-h6vlgr1n072s8ltee70oopus3qjh3h74.apps.googleusercontent.com';
+function getOAuthClientId() { return localStorage.getItem('oauth_client_id') || DEFAULT_OAUTH_CLIENT_ID; }
+
 function initGIS() {
   if (gisInited) return;
-  const clientId = localStorage.getItem('oauth_client_id');
-  if (!clientId) { toast('⚠ 請先在設定中填入 OAuth Client ID'); return; }
+  const clientId = getOAuthClientId();
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: clientId,
     scope: 'https://www.googleapis.com/auth/drive.file',
@@ -1700,8 +1702,6 @@ function initGIS() {
 }
 
 async function uploadToDrive() {
-  const clientId = localStorage.getItem('oauth_client_id');
-  if (!clientId) { showUploadMsg('❌ 請先在設定中填入 OAuth Client ID', true); openSettings(); return; }
   if (typeof google === 'undefined') { showUploadMsg('❌ Google Identity Services 尚未載入，請重新整理頁面', true); return; }
   initGIS();
   if (!oauthToken) {

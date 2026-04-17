@@ -1377,7 +1377,8 @@
     }
   }
 
-  function getOAuthClientId() { return localStorage.getItem('oauth_client_id') || ''; }
+  const DEFAULT_OAUTH_CLIENT_ID = '996786285425-h6vlgr1n072s8ltee70oopus3qjh3h74.apps.googleusercontent.com';
+  function getOAuthClientId() { return localStorage.getItem('oauth_client_id') || DEFAULT_OAUTH_CLIENT_ID; }
   function saveOAuthClientId() {
     const val = document.getElementById('oauthClientIdInput').value.trim();
     if (!val) { alert('請填入 Client ID'); return; }
