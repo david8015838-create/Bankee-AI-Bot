@@ -1501,7 +1501,7 @@
     localStorage.removeItem('sop_file_cache_v1');
     const statusEl = document.getElementById('sopStatus');
     if (statusEl) { statusEl.textContent = '快取已清除，重新載入中...'; statusEl.className = 'sop-status'; }
-    loadSopFiles();
+    loadSOPs();
   }
 
   function openSettings() {
