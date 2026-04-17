@@ -441,9 +441,11 @@ function getApiKeys() {
 }
 
 function loadSettings() {
+  const keys = getApiKeys();
   return {
     provider: localStorage.getItem('sop_provider') || 'gemini',
-    model: localStorage.getItem('sop_model') || 'gemini-2.5-flash-lite-preview-06-17'
+    model: localStorage.getItem('sop_model') || 'gemini-2.5-flash-lite-preview-06-17',
+    apiKey: keys[0] || ''
   };
 }
 
