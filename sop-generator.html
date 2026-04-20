@@ -215,6 +215,28 @@ label, .form-label {
 .btn-next.danger { background: linear-gradient(135deg, #34d399, #059669); box-shadow: 0 2px 8px rgba(5,150,105,0.3); }
 .btn-next.danger:hover { box-shadow: 0 6px 16px rgba(5,150,105,0.4); }
 
+/* ── AI Review Step ── */
+.review-issue {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 12px 16px; border-radius: 10px; margin-bottom: 10px;
+  font-size: 13.5px; line-height: 1.5;
+}
+.review-error { background: #fff1f2; border: 1px solid #fecdd3; }
+.review-warning { background: #fffbeb; border: 1px solid #fde68a; }
+.review-badge { font-size: 12px; font-weight: 700; white-space: nowrap; padding-top: 1px; }
+.review-field { font-weight: 600; color: #374151; white-space: nowrap; }
+.review-msg { color: #4b5563; }
+.review-pass {
+  text-align: center; padding: 28px; background: #f0fdf4; border: 1px solid #bbf7d0;
+  border-radius: 12px; font-size: 15px; font-weight: 600; color: #15803d;
+}
+.review-actions { display: flex; gap: 12px; margin-top: 24px; flex-wrap: wrap; }
+.btn-skip {
+  flex: 1; padding: 12px 20px; border-radius: 10px; font-size: 14px; font-weight: 600;
+  border: 1.5px solid #cbd5e1; background: #fff; color: #64748b; cursor: pointer; transition: all 0.15s;
+}
+.btn-skip:hover { background: #f1f5f9; color: #374151; }
+
 /* ── Complete page ── */
 .complete-page { text-align: center; padding: 16px 0; }
 .complete-icon { font-size: 64px; margin-bottom: 16px; filter: drop-shadow(0 4px 12px rgba(0,0,0,0.1)); }
@@ -372,6 +394,7 @@ label, .form-label {
 <header class="app-header">
   <h1>🛠️ SOP 文件生成器</h1>
   <div class="header-actions">
+    <a href="./agent-optimizer.html" class="back-link">⚡ Agent 轉換器</a>
     <a href="./index.html" class="back-link">← 回 SOP 助理</a>
     <button class="icon-btn" onclick="openSettings()" title="設定">⚙️</button>
   </div>
@@ -415,8 +438,8 @@ label, .form-label {
 const FOLDER_ID = '1C4Eg8j2uqomZL9bpKaAGDHJsa-tRJg0D';
 const DRAFT_KEY = 'sop_generator_draft';
 
-const SOP_STEPS = ['基本資訊', '適用對象', '前置準備', '標準步驟', '異常處理', 'FAQ', '維護資訊', '完成'];
-const REF_STEPS = ['基本資訊', '資訊內容', 'FAQ', '完成'];
+const SOP_STEPS = ['基本資訊', '適用對象', '前置準備', '標準步驟', '異常處理', 'FAQ', '維護資訊', 'AI 審核', '完成'];
+const REF_STEPS = ['基本資訊', '資訊內容', 'FAQ', 'AI 審核', '完成'];
 
 // ── State ──────────────────────────────────────────────────
 let docType = null; // 'sop' | 'ref' | 'ai'
@@ -655,9 +678,20 @@ function renderNavBtns(step, lastContentStep) {
   } else {
     wrap.innerHTML += `<button class="btn-prev" onclick="goHome()">← 選擇類型</button>`;
   }
-  const isLast = (step === lastContentStep - 1);
-  const label = isLast ? '生成文件 ✨' : '下一步 →';
-  const cls = isLast ? 'btn-next danger' : 'btn-next';
+  // second-to-last = AI review step; last content step = review step index
+  const isReviewStep = (step === lastContentStep - 1);
+  const isBeforeReview = (step === lastContentStep - 2);
+  let label, cls;
+  if (isReviewStep) {
+    // On review step, nav is handled by review UI buttons; hide next
+    return wrap;
+  } else if (isBeforeReview) {
+    label = '下一步 → AI 審核';
+    cls = 'btn-next';
+  } else {
+    label = '下一步 →';
+    cls = 'btn-next';
+  }
   wrap.innerHTML += `<button class="${cls}" onclick="nextStep()">${label}</button>`;
   return wrap;
 }
@@ -672,6 +706,7 @@ function renderSopStep(step) {
     case 4: return renderSopStep4();
     case 5: return renderSopStep5();
     case 6: return renderSopStep6();
+    case 7: return renderAiReviewStep();
     default: return '';
   }
 }
@@ -891,6 +926,7 @@ function renderRefStep(step) {
     case 0: return renderRefStep0();
     case 1: return renderRefStep1();
     case 2: return renderRefStep2();
+    case 3: return renderAiReviewStep();
     default: return '';
   }
 }
@@ -968,6 +1004,130 @@ function renderRefStep2() {
       </div>
       <button class="add-btn" style="margin-top:12px" onclick="addFaqItem()">＋ 新增問題</button>
     </div>`;
+}
+
+// ── AI Review Step ─────────────────────────────────────────
+let reviewResult = null; // null | { issues: [{level,field,msg}], passed: bool }
+
+function renderAiReviewStep() {
+  const hasKey = getApiKeys().length > 0;
+  const issuesHtml = reviewResult === null ? '' : reviewResult.issues.length === 0
+    ? `<div class="review-pass">✅ 文件品質良好，AI 沒有發現明顯問題！</div>`
+    : reviewResult.issues.map(iss => `
+        <div class="review-issue review-${iss.level}">
+          <span class="review-badge">${iss.level === 'error' ? '❌ 必修' : '⚠️ 建議'}</span>
+          <span class="review-field">${iss.field}</span>
+          <span class="review-msg">${iss.msg}</span>
+        </div>`).join('');
+
+  const btnArea = reviewResult === null
+    ? `<button class="btn-primary" onclick="runAiReview()" id="reviewRunBtn">${hasKey ? '🤖 開始 AI 審核' : '⚠️ 需要設定 API Key 才能審核'}</button>
+       <button class="btn-skip" onclick="skipReview()">略過審核，直接生成</button>`
+    : reviewResult.issues.filter(i => i.level === 'error').length > 0
+      ? `<button class="btn-prev" onclick="prevStep()">← 回去修改</button>
+         <button class="btn-skip" onclick="skipReview()">忽略問題，直接生成</button>`
+      : `<button class="btn-prev" onclick="prevStep()">← 回去修改</button>
+         <button class="btn-primary" onclick="skipReview()">生成文件 ✨</button>`;
+
+  return `
+    <div class="card-title">🔍 AI 審核</div>
+    <div class="card-subtitle">AI 會檢查文件內容是否完整、清晰，確保其他人或 AI Agent 都能正確理解</div>
+    <div id="reviewLoading" style="display:none;text-align:center;padding:32px 0;">
+      <div class="spinner" style="width:28px;height:28px;margin:0 auto 12px;"></div>
+      <div style="color:#64748b;font-size:14px;">AI 正在審核文件...</div>
+    </div>
+    <div id="reviewResults" style="margin:20px 0;">${issuesHtml}</div>
+    <div class="review-actions">${btnArea}</div>`;
+}
+
+async function runAiReview() {
+  const keys = getApiKeys();
+  if (!keys.length) { toast('⚠ 請先設定 API Key'); return; }
+
+  const btn = document.getElementById('reviewRunBtn');
+  if (btn) btn.disabled = true;
+  document.getElementById('reviewLoading').style.display = 'block';
+  document.getElementById('reviewResults').innerHTML = '';
+
+  try {
+    collectCurrentStep();
+    const content = buildReviewContext();
+    const { provider, model } = loadSettings();
+    const apiKey = keys[0];
+
+    const sysMsg = `你是一個 SOP 文件品質審核員。請分析文件內容，找出可能讓 AI Agent 無法正確執行的問題。
+輸出純 JSON 陣列，每個問題包含：
+- level: "error"（必修，會造成 Agent 失敗）或 "warning"（建議改善）
+- field: 問題所在的欄位名稱（例：步驟2、異常處理、FAQ）
+- msg: 具體說明問題（繁體中文，一句話）
+
+只輸出 JSON 陣列，不要有其他文字。若無問題，輸出空陣列 []。
+常見問題類型：
+- 步驟未指定系統名稱或操作路徑
+- 步驟未說明成功判斷標準
+- 使用模糊詞：盡快、通常、相關人員、適當
+- 異常處理只寫「聯絡主管」沒有具體說明
+- FAQ 答案為空或過於簡短`;
+
+    const userMsg = `請審核以下文件內容：\n\n${content}`;
+
+    let raw = provider === 'gemini'
+      ? await callGemini(apiKey, model, sysMsg, userMsg)
+      : await callOpenAI(apiKey, model, sysMsg, userMsg);
+
+    const match = raw.match(/\[[\s\S]*\]/);
+    if (!match) throw new Error('無法解析回應');
+    const issues = JSON.parse(match[0]);
+    reviewResult = { issues, passed: issues.filter(i => i.level === 'error').length === 0 };
+  } catch(e) {
+    reviewResult = { issues: [], passed: true };
+    toast('⚠ 審核失敗，可直接生成：' + (e.message || e));
+  }
+
+  document.getElementById('reviewLoading').style.display = 'none';
+  const card = document.querySelector('.card');
+  if (card) card.innerHTML = renderAiReviewStep();
+}
+
+function buildReviewContext() {
+  if (docType === 'sop') {
+    const s0 = sopData.step0 || {}, s1 = sopData.step1 || {}, s2 = sopData.step2 || {};
+    const s3 = sopData.step3 || {}, s4 = sopData.step4 || {}, s5 = sopData.step5 || {};
+    const parts = [
+      `【標題】${s0.title || '（未填）'}`,
+      `【核心總結】${s0.summary || '（未填）'}`,
+      `【適用對象】${s1.who || '（未填）'}`,
+      `【前置準備】系統權限：${s2.perm || '無'}；工具：${s2.tools || '無'}；資料：${s2.docs || '無'}`,
+    ];
+    if (s3.steps?.length) {
+      s3.steps.forEach((st, i) => {
+        parts.push(`【步驟${i+1}：${st.name}】執行人：${st.who || '未填'}；位置：${st.where || '未填'}；動作：${st.action || '未填'}；完成指標：${st.done || '未填'}；注意：${st.note || '無'}`);
+      });
+    } else { parts.push('【步驟】（未填）'); }
+    if (s4.cases?.length) {
+      s4.cases.forEach((c, i) => parts.push(`【異常${i+1}】狀況：${c.situation || '未填'}；解法：${c.solution || '未填'}`));
+    } else { parts.push('【異常處理】（未填）'); }
+    if (s5.faqs?.length) {
+      s5.faqs.forEach((f, i) => parts.push(`【FAQ${i+1}】Q：${f.q || '未填'} / A：${f.a || '未填'}`));
+    }
+    return parts.join('\n');
+  } else {
+    const r0 = refData.step0 || {}, r1 = refData.step1 || {}, r2 = refData.step2 || {};
+    const parts = [
+      `【標題】${r0.title || '（未填）'}`,
+      `【說明】${r0.summary || '（未填）'}`,
+    ];
+    (r1.items || []).forEach((it, i) => parts.push(`【資訊${i+1}】類別：${it.cat}；說明：${it.desc || '未填'}；連結：${it.url || '無'}`));
+    (r2.faqs || []).forEach((f, i) => parts.push(`【FAQ${i+1}】Q：${f.q || '未填'} / A：${f.a || '未填'}`));
+    return parts.join('\n');
+  }
+}
+
+function skipReview() {
+  reviewResult = null;
+  currentStep++;
+  render();
+  window.scrollTo(0, 0);
 }
 
 // ── Complete page ──────────────────────────────────────────
@@ -1126,6 +1286,7 @@ function nextStep() {
 function prevStep() {
   collectCurrentStep();
   saveDraft();
+  reviewResult = null; // reset review when going back
   currentStep--;
   render();
   window.scrollTo(0, 0);
