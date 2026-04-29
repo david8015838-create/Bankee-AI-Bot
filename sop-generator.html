@@ -739,6 +739,15 @@ function renderSopStep0() {
       <div class="radio-group" id="rg_importance">
         ${['一般','重要','緊急'].map(v => `<label class="radio-label${(d.importance||'一般')===v?' selected':''}" data-rg="importance" data-v="${v}"><input type="radio" name="importance" value="${v}" ${(d.importance||'一般')===v?'checked':''}>${v}</label>`).join('')}
       </div>
+    </div>
+    <div class="form-group" style="margin-top:16px">
+      <label class="form-label">排除標籤 <span class="hint">（防 AI 混淆的關鍵欄位）</span></label>
+      <input class="form-input" id="s0_exclusionTags" placeholder="與本流程容易混淆但不適用的主題，逗號分隔。例：貸款,信用卡,外匯" value="${esc(d.exclusionTags||'')}">
+      <div style="font-size:12px;color:#888;margin-top:4px">⚠️ 建議填寫，可顯著減少 AI 在相似流程間的誤判</div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">相似文件名稱 <span class="hint">（選填）</span></label>
+      <input class="form-input" id="s0_similarDocs" placeholder="功能相似但情境不同的其他文件名稱，逗號分隔。例：貸款請款流程" value="${esc(d.similarDocs||'')}">
     </div>`;
 }
 
@@ -1183,7 +1192,8 @@ function collectCurrentStep() {
         sopData.step0 = {
           title: v('s0_title'), dept: v('s0_dept'),
           duration: v('s0_duration'), summary: v('s0_summary'),
-          importance: collectRadio('importance') || '一般'
+          importance: collectRadio('importance') || '一般',
+          exclusionTags: v('s0_exclusionTags'), similarDocs: v('s0_similarDocs')
         }; break;
       case 1:
         sopData.step1 = { who: v('s1_who'), nowho: v('s1_nowho'), when: v('s1_when'), nowhen: v('s1_nowhen') }; break;
@@ -1692,7 +1702,19 @@ function generateSopMd() {
   const s5 = sopData.step5 || {};
   const s6 = sopData.step6 || {};
 
+  const exclusionTags = (s0.exclusionTags || '').split(',').map(t => t.trim()).filter(Boolean);
+  const similarDocs = (s0.similarDocs || '').split(',').map(t => t.trim()).filter(Boolean);
+
   const lines = [];
+  lines.push('---');
+  lines.push(`namespace: ${s0.dept || '未分類'}`);
+  lines.push('doc_type: SOP');
+  lines.push(`exclusion_tags: [${exclusionTags.join(', ')}]`);
+  lines.push(`similar_docs: [${similarDocs.join(', ')}]`);
+  lines.push(`version: "${s6.date || new Date().toISOString().slice(0,10)}"`);
+  lines.push(`owner: "${s6.owner || ''}"`);
+  lines.push('---');
+  lines.push('');
   lines.push(`# ${s0.title || '（未命名）'}`);
   const meta = [s0.dept && `**部門**：${s0.dept}`, `**重要程度**：${s0.importance || '一般'}`, s0.duration && `**預計耗時**：${s0.duration}`].filter(Boolean);
   if (meta.length) lines.push('> ' + meta.join(' ｜ '));
@@ -1832,9 +1854,35 @@ function generateRefMd() {
 }
 
 // ── Download ───────────────────────────────────────────────
+function validateMd(content) {
+  const errors = [];
+  const warnings = [];
+  if (!content.startsWith('---')) errors.push('❌ 缺少 YAML 前置資料（namespace / exclusion_tags）');
+  if (!/^# .+/m.test(content)) errors.push('❌ 缺少 H1 主標題');
+  if (docType === 'sop') {
+    ['適用對象','前置準備','標準步驟','維護資訊'].forEach(s => {
+      if (!content.includes(`## ${s}`)) errors.push(`❌ 缺少必要區塊：## ${s}`);
+    });
+    if (/exclusion_tags: \[\]/.test(content)) {
+      warnings.push('⚠️ exclusion_tags 為空，建議填寫以防 AI 混淆相似流程');
+    }
+  }
+  return { errors, warnings, isValid: errors.length === 0 };
+}
+
 function downloadMd() {
-  const filename = (document.getElementById('filenameInput')?.value.trim() || 'document') + '.md';
   const content = generateMd();
+  const { errors, warnings, isValid } = validateMd(content);
+
+  if (!isValid) {
+    alert('文件驗證失敗，請修正以下問題：\n\n' + errors.join('\n'));
+    return;
+  }
+  if (warnings.length > 0) {
+    if (!confirm('注意事項：\n\n' + warnings.join('\n') + '\n\n確定要下載嗎？')) return;
+  }
+
+  const filename = (document.getElementById('filenameInput')?.value.trim() || 'document') + '.md';
   const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
