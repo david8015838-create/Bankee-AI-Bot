@@ -1235,7 +1235,7 @@
         使用的模型
       </h3>
       <ul style="margin:0 0 12px 18px;">
-        <li style="margin-bottom:6px;"><b>Embedding 模型</b>：Gemini <code style="background:#f1f5f9;padding:1px 6px;border-radius:4px;font-size:12px;">text-embedding-004</code>（768 維向量，目前免費）</li>
+        <li style="margin-bottom:6px;"><b>Embedding 模型</b>：Gemini <code style="background:#f1f5f9;padding:1px 6px;border-radius:4px;font-size:12px;">gemini-embedding-001</code>（首選，768 維），失敗時自動 fallback 到 <code style="background:#f1f5f9;padding:1px 6px;border-radius:4px;font-size:12px;">text-embedding-004</code></li>
         <li><b>Chat 模型</b>：依設定，預設 Gemini 2.5 Flash Lite。可在「⚙️ API 設定」中切換</li>
       </ul>
 
@@ -1536,10 +1536,12 @@
   let currentKeyIndex = 0;
 
   const EMBED_CACHE_KEY = 'sop_embed_cache';
-  const EMBED_MODEL = 'text-embedding-004';
+  const EMBED_MODELS = ['gemini-embedding-001', 'text-embedding-004']; // try in order
+  const EMBED_DIMENSIONS = 768;
   const MAX_CONTEXT_CHARS = 60000;
   const SIMILARITY_THRESHOLD = 0.45;
   const TOP_N_DOCS = 5;
+  let currentEmbedModel = localStorage.getItem('sop_embed_model') || null;
 
   // ═══════════════════════════════════════
   // SETTINGS
@@ -2119,7 +2121,10 @@
   function isDocIndexed(file) {
     const cache = readEmbedCache();
     const sig = contentSignature(file.content);
-    return Object.values(cache).some(c => c.docId === file.id && c.sig === sig);
+    return Object.values(cache).some(c =>
+      c.docId === file.id && c.sig === sig &&
+      (!currentEmbedModel || c.model === currentEmbedModel)
+    );
   }
 
   function chunkifyDoc(content, docId, docName) {
@@ -2161,27 +2166,58 @@
 
   let lastEmbedError = null;
 
-  async function embedText(text, apiKey) {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${EMBED_MODEL}:embedContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: `models/${EMBED_MODEL}`, content: { parts: [{ text: text.slice(0, 3000) }] } })
+  async function embedText(text, apiKey, taskType) {
+    const modelsToTry = currentEmbedModel ? [currentEmbedModel, ...EMBED_MODELS.filter(m => m !== currentEmbedModel)] : EMBED_MODELS;
+    let lastError;
+
+    for (const model of modelsToTry) {
+      try {
+        const body = {
+          model: `models/${model}`,
+          content: { parts: [{ text: text.slice(0, 3000) }] }
+        };
+        // gemini-embedding-001 supports outputDimensionality and taskType; text-embedding-004 ignores them gracefully
+        if (model === 'gemini-embedding-001') {
+          body.outputDimensionality = EMBED_DIMENSIONS;
+          if (taskType) body.taskType = taskType;
+        }
+
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:embedContent?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+          }
+        );
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          const msg = errData?.error?.message || `HTTP ${res.status} ${res.statusText}`;
+          const code = errData?.error?.status || '';
+          const err = new Error(code ? `[${code}] ${msg}` : msg);
+          err.status = res.status;
+          throw err;
+        }
+        const data = await res.json();
+        if (!data.embedding || !data.embedding.values) {
+          throw new Error('API 回傳格式異常：' + JSON.stringify(data).slice(0, 200));
+        }
+        if (currentEmbedModel !== model) {
+          currentEmbedModel = model;
+          localStorage.setItem('sop_embed_model', model);
+          console.log(`✓ 使用 embedding 模型：${model}`);
+        }
+        return data.embedding.values;
+      } catch(e) {
+        lastError = e;
+        // Only try next model if it's a "not found / not supported / bad request" type error
+        if (!/not.found|not.supported|invalid.argument|404|400/i.test(e.message)) {
+          throw e; // permission/quota/network errors → don't retry with different model
+        }
+        console.warn(`Model ${model} failed, trying next:`, e.message);
       }
-    );
-    if (!res.ok) {
-      const errData = await res.json().catch(() => ({}));
-      const msg = errData?.error?.message || `HTTP ${res.status} ${res.statusText}`;
-      const code = errData?.error?.status || '';
-      const fullMsg = code ? `[${code}] ${msg}` : msg;
-      throw new Error(fullMsg);
     }
-    const data = await res.json();
-    if (!data.embedding || !data.embedding.values) {
-      throw new Error('API 回傳格式異常：' + JSON.stringify(data).slice(0, 200));
-    }
-    return data.embedding.values;
+    throw lastError;
   }
 
   async function ensureDocEmbedded(file) {
@@ -2193,7 +2229,9 @@
     const cache = readEmbedCache();
     const sig = contentSignature(file.content);
     const chunks = chunkifyDoc(file.content, file.id, file.name);
-    const allCached = chunks.every(c => cache[c.id] && cache[c.id].sig === sig);
+    const allCached = chunks.every(c =>
+      cache[c.id] && cache[c.id].sig === sig && cache[c.id].model === currentEmbedModel
+    );
     if (allCached) return;
 
     for (const key of Object.keys(cache)) {
@@ -2202,8 +2240,8 @@
 
     for (const chunk of chunks) {
       try {
-        const vector = await embedText(chunk.content, keys[0]);
-        cache[chunk.id] = { ...chunk, vector, sig };
+        const vector = await embedText(chunk.content, keys[0], 'RETRIEVAL_DOCUMENT');
+        cache[chunk.id] = { ...chunk, vector, sig, model: currentEmbedModel };
         await new Promise(r => setTimeout(r, 60));
       } catch(e) {
         if (!lastEmbedError) lastEmbedError = e.message;
@@ -2309,11 +2347,14 @@
     if (!keys.length) { lastRetrievalInfo = { mode: 'fallback', reason: '無 API Key' }; return null; }
 
     const cache = readEmbedCache();
-    const allChunks = Object.values(cache).filter(c => c.vector && activeFileIds.has(c.docId));
+    const allChunks = Object.values(cache).filter(c =>
+      c.vector && activeFileIds.has(c.docId) &&
+      (!currentEmbedModel || c.model === currentEmbedModel)
+    );
     if (allChunks.length === 0) { lastRetrievalInfo = { mode: 'fallback', reason: '無可用索引' }; return null; }
 
     try {
-      const queryVector = await embedText(query, keys[0]);
+      const queryVector = await embedText(query, keys[0], 'RETRIEVAL_QUERY');
       const docScores = {};
       for (const chunk of allChunks) {
         const sim = cosineSimilarity(queryVector, chunk.vector);
