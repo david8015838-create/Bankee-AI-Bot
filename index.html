@@ -1052,191 +1052,278 @@
       <!-- 一句話總結 -->
       <div style="background:linear-gradient(135deg,#eef2ff,#f5f3ff);border-left:4px solid #6366f1;padding:14px 18px;border-radius:0 10px 10px 0;margin-bottom:24px;">
         <div style="font-size:13px;font-weight:700;color:#4f46e5;margin-bottom:4px;">📌 一句話總結</div>
-        <div style="font-size:14px;color:#1e1b4b;">這是一個<b>純瀏覽器運作</b>的 SOP 智慧助理，使用<b>語意向量搜尋</b>技術從你的 SOP 文件中找出與問題相關的內容，再交由 AI 模型生成自然語言回答。</div>
+        <div style="font-size:14px;color:#1e1b4b;">這是一個<b>純前端、零後端</b>的 SOP 智慧助理。採用 <b>Chunk-level Embedding + Document-level Injection</b> 的混合檢索策略：用細粒度向量搜尋精準定位答案藏在哪份文件，再把整份文件注入給 LLM 保留上下文。</div>
+      </div>
+
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px;">
+        <span style="padding:4px 10px;background:#dbeafe;color:#1e40af;border-radius:12px;font-size:11.5px;font-weight:600;">純前端</span>
+        <span style="padding:4px 10px;background:#fef3c7;color:#92400e;border-radius:12px;font-size:11.5px;font-weight:600;">語意檢索 (RAG)</span>
+        <span style="padding:4px 10px;background:#dcfce7;color:#15803d;border-radius:12px;font-size:11.5px;font-weight:600;">Chunk 索引｜文件注入</span>
+        <span style="padding:4px 10px;background:#f3e8ff;color:#6b21a8;border-radius:12px;font-size:11.5px;font-weight:600;">Gemini Embedding 001 / 002</span>
+        <span style="padding:4px 10px;background:#fee2e2;color:#991b1b;border-radius:12px;font-size:11.5px;font-weight:600;">三道注入護欄</span>
       </div>
 
       <!-- 區段 1：整體架構 -->
       <h3 style="font-size:15px;font-weight:800;color:#0f172a;margin:8px 0 12px;display:flex;align-items:center;gap:8px;">
         <span style="background:#4f8ef7;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">1</span>
-        整體架構
+        整體架構與技術棧
       </h3>
-      <p style="margin-bottom:10px;">這個系統<b>沒有後端伺服器</b>，所有資料和運算都發生在你的瀏覽器內。</p>
-      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px;margin-bottom:14px;font-family:'SF Mono',monospace;font-size:12.5px;line-height:1.9;color:#475569;">
-        你的瀏覽器<br>
-        ├── localStorage（個人筆記、設定、API Key、向量索引）<br>
-        ├── Google Drive API（讀取/寫入 SOP 文件）<br>
-        └── AI API（Gemini / OpenAI / Anthropic）<br>
-        &nbsp;&nbsp;&nbsp;&nbsp;├── Embedding API（把文字轉成向量）<br>
-        &nbsp;&nbsp;&nbsp;&nbsp;└── Chat API（生成回答）
+      <p style="margin-bottom:10px;">前端是一份靜態 HTML，部署在 GitHub Pages。所有狀態、運算、API 呼叫都發生在使用者瀏覽器內，<b>沒有任何中間伺服器</b>。</p>
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px;margin-bottom:14px;font-family:'SF Mono',ui-monospace,monospace;font-size:12.5px;line-height:1.9;color:#475569;">
+        Browser (Vanilla JS, no framework)<br>
+        │<br>
+        ├─ localStorage（4 個 key，下方詳述）<br>
+        │<br>
+        ├─ Google Drive API v3<br>
+        │&nbsp;&nbsp;&nbsp;├─ 公開 API Key（列舉檔案）<br>
+        │&nbsp;&nbsp;&nbsp;└─ OAuth 2.0 Implicit Flow（下載/上傳檔案內容）<br>
+        │<br>
+        ├─ Gemini Embedding API<br>
+        │&nbsp;&nbsp;&nbsp;└─ <code>generativelanguage.googleapis.com/v1beta/models/{model}:embedContent</code><br>
+        │<br>
+        └─ Chat API（Gemini / OpenAI / Anthropic）
       </div>
-      <p style="margin-bottom:20px;color:#64748b;font-size:13px;">所有 API 都是從你的瀏覽器直接打給服務商，沒有任何中間伺服器收集你的問題或文件內容。</p>
 
-      <!-- 區段 2：文件載入 -->
+      <!-- 區段 2：文件擷取 -->
       <h3 style="font-size:15px;font-weight:800;color:#0f172a;margin:24px 0 12px;display:flex;align-items:center;gap:8px;">
         <span style="background:#4f8ef7;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">2</span>
-        文件如何載入
+        文件擷取（Document Ingestion）
       </h3>
-      <ol style="margin:0 0 16px 18px;padding:0;">
-        <li style="margin-bottom:8px;">點「📁 開啟文件庫」後，系統會去指定的 Google Drive 資料夾抓取所有文件清單。</li>
-        <li style="margin-bottom:8px;">每份文件的內容（Markdown 或純文字）會被下載到瀏覽器，並存在本機快取（24 小時內不再重新下載）。</li>
-        <li style="margin-bottom:8px;">下載完成後，系統會立刻在背景開始建立<b>語意索引</b>（見下一段）。</li>
-        <li>狀態列會即時顯示進度，例如「建立語意索引 3/12...」。</li>
+      <ol style="margin:0 0 12px 18px;padding:0;">
+        <li style="margin-bottom:8px;"><b>列舉檔案</b>：呼叫 <code>files.list</code> with <code>q='{FOLDER_ID}' in parents</code>，取得指定 Drive 資料夾內所有檔案的 metadata（id、name、mimeType、webViewLink）。</li>
+        <li style="margin-bottom:8px;"><b>下載內容</b>：
+          <ul style="margin:6px 0 0 18px;">
+            <li>Google Docs（<code>application/vnd.google-apps.document</code>）→ 用 <code>files.export</code> 匯出 HTML，再以 <code>googleDocHtmlToText()</code> 轉成純文字。</li>
+            <li>純文字 / Markdown → 用 <code>files.get?alt=media</code> 直接拉原檔。</li>
+          </ul>
+        </li>
+        <li style="margin-bottom:8px;"><b>內容快取</b>：每份文件下載後寫入 localStorage（key: <code>sop_file_cache_v1</code>），TTL 24 小時，過期或網路失敗會 fallback 到舊快取（degraded mode）。</li>
+        <li><b>觸發索引</b>：載入完成後立即在背景呼叫 <code>embedAllDocs()</code> 建立向量索引。</li>
       </ol>
 
-      <!-- 區段 3：核心：Chunk-level Embedding -->
+      <!-- 區段 3：Chunk 切分 -->
       <h3 style="font-size:15px;font-weight:800;color:#0f172a;margin:24px 0 12px;display:flex;align-items:center;gap:8px;">
         <span style="background:#7c5cfc;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">3</span>
-        核心技術：Chunk-level Embedding
+        Chunk 切分策略
       </h3>
-      <p style="margin-bottom:12px;">這是整個系統最關鍵的部分。<b>Embedding</b> 的意思是把一段文字翻譯成一組數字陣列（向量），意思相近的文字會有相近的向量。</p>
+      <p style="margin-bottom:10px;">每份文件由 <code>chunkifyDoc()</code> 切成多個 chunks，規則如下：</p>
+      <ul style="margin:0 0 14px 18px;">
+        <li style="margin-bottom:6px;"><b>切點</b>：以正規表達式 <code>/^#{1,3} /</code> 匹配 Markdown 標題（<code>#</code>、<code>##</code>、<code>###</code>）。</li>
+        <li style="margin-bottom:6px;"><b>邊界</b>：標題行屬於下一個 chunk 的開頭，每個 chunk 保留所屬的 heading 資訊。</li>
+        <li style="margin-bottom:6px;"><b>最小長度</b>：trim 後少於 30 字的 chunk 直接捨棄（過短的無意義片段）。</li>
+        <li><b>退化處理</b>：若文件完全沒有 heading，整份視為單一 chunk（等同退化到文件級 embedding）。</li>
+      </ul>
 
-      <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:14px 18px;margin-bottom:14px;">
-        <div style="font-size:13px;font-weight:700;color:#9a3412;margin-bottom:8px;">📊 範例</div>
-        <div style="font-family:monospace;font-size:12.5px;color:#7c2d12;line-height:1.9;">
-          「請假要找誰審核」&nbsp;&nbsp;→ [0.12, -0.87, 0.43, ...]<br>
-          「假單簽核流程」&nbsp;&nbsp;&nbsp;&nbsp;→ [0.11, -0.85, 0.41, ...]&nbsp;&nbsp;<span style="color:#16a34a;">← 很相近</span><br>
-          「報帳單據規定」&nbsp;&nbsp;&nbsp;&nbsp;→ [0.67, 0.23, -0.12, ...]&nbsp;&nbsp;<span style="color:#dc2626;">← 差很遠</span>
-        </div>
+      <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:14px 18px;margin-bottom:14px;font-size:13px;">
+        <div style="font-weight:700;color:#9a3412;margin-bottom:8px;">為什麼選文件級 heading 切，而不是固定字數？</div>
+        <p style="color:#7c2d12;margin:0;">SOP 文件由「適用對象 / 前置準備 / 標準步驟 / FAQ / 維護資訊」這類語意完整的段落構成，按 heading 切剛好對齊這些語意邊界。固定字數會把同一個步驟切兩半，導致向量失真。</p>
       </div>
 
-      <p style="margin-bottom:10px;"><b>「Chunk-level」</b>表示我們不是把整份文件壓成一個向量，而是<b>按 Markdown 的標題（## 和 ###）切成小段</b>，每段各自 embedding。</p>
-
-      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px;margin-bottom:14px;font-size:13px;">
-        <div style="font-weight:700;color:#0f172a;margin-bottom:8px;">為什麼要切小段？</div>
-        <p style="margin-bottom:8px;">想像你有一份「工作基本資訊」文件，裡面有 20 條不同性質的資訊（VPN、印表機、資料夾路徑、HR 系統...）。</p>
-        <p style="margin-bottom:8px;color:#dc2626;">❌ 若整份文件只算一個向量 → 向量會是「雜項資訊彙整」這個模糊的語意，使用者問「財務報表在哪」時很難命中。</p>
-        <p style="color:#16a34a;">✅ 切成 chunks 後 → 每條資訊各自有自己的向量，「財務報表：\\server\finance\reports」這段會直接命中。</p>
-      </div>
-
-      <p style="margin-bottom:20px;">所有 chunk 的向量會存在你瀏覽器的 localStorage 裡，下次開啟不用重算。</p>
-
-      <!-- 區段 4：搜尋流程 -->
+      <!-- 區段 4：Embedding -->
       <h3 style="font-size:15px;font-weight:800;color:#0f172a;margin:24px 0 12px;display:flex;align-items:center;gap:8px;">
-        <span style="background:#10b981;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">4</span>
-        提問時發生什麼事
+        <span style="background:#7c5cfc;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">4</span>
+        Embedding 配置
+      </h3>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:14px;font-size:13px;">
+        <tbody>
+          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:600;width:140px;">主模型</td><td style="padding:8px 12px;border:1px solid #e2e8f0;"><code>gemini-embedding-001</code></td></tr>
+          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:600;">Fallback 模型</td><td style="padding:8px 12px;border:1px solid #e2e8f0;"><code>gemini-embedding-002</code>（當主模型回傳 404 / not supported / invalid argument 時切換）</td></tr>
+          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:600;">輸出維度</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">768 維（透過 <code>outputDimensionality</code> 參數指定，節省 localStorage 空間）</td></tr>
+          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:600;">Task Type</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">
+            <code>RETRIEVAL_DOCUMENT</code>（文件 chunk 索引時）<br>
+            <code>RETRIEVAL_QUERY</code>（使用者提問時）<br>
+            <span style="color:#64748b;font-size:12px;">— Google 推薦的非對稱檢索組合，對中文檢索品質有顯著提升</span></td></tr>
+          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:600;">內容截斷</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">每個 chunk 送入 API 前截斷至前 3000 字</td></tr>
+          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:600;">速率控制</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">每次 embedding 請求間隔 60ms，避免短時間打爆 quota</td></tr>
+        </tbody>
+      </table>
+      <p style="margin-bottom:20px;font-size:13px;color:#64748b;">成功的模型名稱會寫入 <code>sop_embed_model</code>，之後直接使用，不再每次都 fallback 試錯。</p>
+
+      <!-- 區段 5：Retrieval Pipeline -->
+      <h3 style="font-size:15px;font-weight:800;color:#0f172a;margin:24px 0 12px;display:flex;align-items:center;gap:8px;">
+        <span style="background:#10b981;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">5</span>
+        Retrieval Pipeline（提問到回答）
       </h3>
       <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:16px 20px;margin-bottom:14px;font-size:13.5px;">
-        <div style="font-weight:700;color:#15803d;margin-bottom:10px;">完整流程</div>
         <ol style="margin:0;padding-left:20px;">
-          <li style="margin-bottom:6px;">你輸入問題 → 送給 Gemini Embedding API → 拿到問題的向量</li>
-          <li style="margin-bottom:6px;">把問題向量 vs 所有 chunk 向量做<b>餘弦相似度比對</b>（cosine similarity）</li>
-          <li style="margin-bottom:6px;">每份文件取最高相似度分數，依分數排名</li>
-          <li style="margin-bottom:6px;">套用三道護欄：相似度 ≥ 0.45、最多 5 份、總字數不超過 60,000 字</li>
-          <li style="margin-bottom:6px;">把命中的<b>整份文件</b>（不只 chunk）注入給 Chat AI 當參考資料</li>
-          <li>AI 根據文件回答問題，並標示來源</li>
+          <li style="margin-bottom:8px;"><b>Query Embedding</b>：使用者問題送入 <code>embedText(query, key, 'RETRIEVAL_QUERY')</code>，產生 768 維問題向量。</li>
+          <li style="margin-bottom:8px;"><b>Candidate Pool</b>：從 <code>sop_embed_cache</code> 取出所有 chunks，過濾條件：
+            <ul style="margin:4px 0 0 18px;color:#166534;">
+              <li>vector 欄位存在</li>
+              <li>所屬 docId ∈ activeFileIds（使用者勾選的文件）</li>
+              <li>chunk.model === currentEmbedModel（避免跨模型比對）</li>
+            </ul>
+          </li>
+          <li style="margin-bottom:8px;"><b>Similarity Scoring</b>：對每個候選 chunk 計算 cosine similarity = (a·b) / (‖a‖‖b‖)。</li>
+          <li style="margin-bottom:8px;"><b>Document-level Max-Pooling</b>：每份文件取其 chunks 中的最高分作為該文件的代表分數。</li>
+          <li style="margin-bottom:8px;"><b>Filter + Rank + TopN</b>：分數 ≥ 0.45 → 由高到低排序 → 取前 5 份。</li>
+          <li style="margin-bottom:8px;"><b>Context Assembly</b>：
+            <ul style="margin:4px 0 0 18px;color:#166534;">
+              <li>先放釘選文件（pinnedFileIds，繞過 retrieval）</li>
+              <li>再放命中的文件全文</li>
+              <li>累積字數 ≤ 60,000 字</li>
+            </ul>
+          </li>
+          <li style="margin-bottom:8px;"><b>Prompt Injection</b>：以函數型 <code>String.replace('{context}', () =&gt; context)</code> 注入，避免內容含 <code>$&amp;</code> / <code>$1</code> 等特殊替換 token。</li>
+          <li><b>Chat Completion</b>：附帶對話歷史與 system prompt 呼叫 Chat API。同 provider 內有多 model fallback、多 key 輪替。</li>
         </ol>
       </div>
 
       <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:10px;padding:14px 18px;margin-bottom:20px;">
-        <div style="font-size:13px;font-weight:700;color:#92400e;margin-bottom:6px;">💡 為什麼用 chunk 找，卻注入整份文件？</div>
-        <p style="font-size:13px;color:#78350f;margin:0;">Chunk 用來<b>精準定位</b>「答案藏在哪份文件」，但 AI 需要文件的<b>完整上下文</b>才能準確回答。所以搜尋粒度細，注入粒度粗，兩者兼顧。</p>
+        <div style="font-size:13px;font-weight:700;color:#92400e;margin-bottom:6px;">💡 為什麼 chunk 用於檢索、卻注入整份文件？</div>
+        <p style="font-size:13px;color:#78350f;margin:0;">「Small-to-Big Retrieval」策略：chunk 提供高解析度的<b>定位能力</b>（能在「工作基本資訊」這種雜項索引型文件中精準命中其中一條），但孤立的 chunk 對 LLM 來說缺乏脈絡（例如知道「步驟三：開啟財務系統」卻不知道前後步驟）。注入整份文件能保留 SOP 的因果順序與條件，回答品質遠優於只丟 chunk。</p>
       </div>
 
-      <!-- 區段 5：常駐文件 -->
+      <!-- 區段 6：常駐文件 -->
       <h3 style="font-size:15px;font-weight:800;color:#0f172a;margin:24px 0 12px;display:flex;align-items:center;gap:8px;">
-        <span style="background:#f59e0b;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">5</span>
-        📌 常駐文件功能
+        <span style="background:#f59e0b;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">6</span>
+        📌 常駐文件（Pinned Documents）
       </h3>
-      <p style="margin-bottom:10px;">有時候某份文件是「不管問什麼都應該參考」的（例如部門通訊錄、系統路徑速查表），這時可以點文件名稱旁的 <b>📌</b> 把它設為常駐。</p>
-      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px;margin-bottom:14px;font-size:13.5px;">
-        <div style="font-weight:700;color:#0f172a;margin-bottom:6px;">常駐文件 vs 一般文件</div>
-        <ul style="margin:0;padding-left:20px;">
-          <li style="margin-bottom:5px;"><b>一般文件</b>：要被語意搜尋命中才會注入</li>
-          <li><b>常駐文件</b>（📌）：每次提問都必定注入，繞過搜尋</li>
-        </ul>
-      </div>
-      <p style="margin-bottom:20px;color:#64748b;font-size:13px;">適合用在你常常需要查路徑、聯絡人、系統設定的速查型文件。</p>
-
-      <!-- 區段 6：勾選 / 索引狀態 -->
-      <h3 style="font-size:15px;font-weight:800;color:#0f172a;margin:24px 0 12px;display:flex;align-items:center;gap:8px;">
-        <span style="background:#8b5cf6;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">6</span>
-        其他控制
-      </h3>
-      <table style="width:100%;border-collapse:collapse;margin-bottom:20px;font-size:13.5px;">
-        <thead>
-          <tr style="background:#f1f5f9;">
-            <th style="text-align:left;padding:10px 14px;border:1px solid #e2e8f0;font-weight:700;color:#0f172a;width:80px;">圖示</th>
-            <th style="text-align:left;padding:10px 14px;border:1px solid #e2e8f0;font-weight:700;color:#0f172a;">功能</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr><td style="padding:10px 14px;border:1px solid #e2e8f0;">☑ 勾選框</td><td style="padding:10px 14px;border:1px solid #e2e8f0;">勾選後此文件才會被納入搜尋範圍，取消勾選則完全排除</td></tr>
-          <tr style="background:#fafafa;"><td style="padding:10px 14px;border:1px solid #e2e8f0;">📌 釘選</td><td style="padding:10px 14px;border:1px solid #e2e8f0;">設為常駐文件，每次必定注入</td></tr>
-          <tr><td style="padding:10px 14px;border:1px solid #e2e8f0;"><span style="color:#10b981;">⚡</span> 綠色閃電</td><td style="padding:10px 14px;border:1px solid #e2e8f0;">此文件已建立語意索引（點擊可強制重建）</td></tr>
-          <tr style="background:#fafafa;"><td style="padding:10px 14px;border:1px solid #e2e8f0;"><span style="color:#9ca3af;">○</span> 灰色圈</td><td style="padding:10px 14px;border:1px solid #e2e8f0;">尚未索引（點擊立即索引此份）</td></tr>
-          <tr><td style="padding:10px 14px;border:1px solid #e2e8f0;">✏️ 編輯</td><td style="padding:10px 14px;border:1px solid #e2e8f0;">直接在瀏覽器編輯文件，存檔後會自動同步回 Google Drive 並重新索引</td></tr>
-        </tbody>
-      </table>
+      <p style="margin-bottom:10px;">某些參照型文件（部門通訊錄、系統路徑速查表、職稱對照表）不管問什麼都可能需要，但其內容雜項過多，文件級向量無法穩定命中。這類文件可以釘選為常駐。</p>
+      <ul style="margin:0 0 14px 18px;">
+        <li style="margin-bottom:6px;"><b>運作方式</b>：釘選後存入 <code>sop_pinned_ids</code>，每次提問時無條件加入 context，不參與 cosine similarity 排序。</li>
+        <li style="margin-bottom:6px;"><b>優先順序</b>：常駐文件總是排在 retrieval 命中的文件<b>之前</b>注入。</li>
+        <li><b>字數限制</b>：仍受 60,000 字總上限約束（若所有常駐文件加總超標，後面的 retrieval 命中可能會被截斷）。</li>
+      </ul>
 
       <!-- 區段 7：護欄 -->
       <h3 style="font-size:15px;font-weight:800;color:#0f172a;margin:24px 0 12px;display:flex;align-items:center;gap:8px;">
         <span style="background:#ef4444;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">7</span>
-        三道護欄：防止注入太多內容
+        三道注入護欄
       </h3>
-      <p style="margin-bottom:10px;">為了避免文件量變多時，把太多內容塞給 AI 導致品質下降或費用爆炸，系統設置三層保險：</p>
-      <ol style="margin:0 0 20px 18px;">
-        <li style="margin-bottom:8px;"><b>相似度閾值（0.45）</b>：低於此分數的文件直接捨棄，避免硬塞不相關的內容</li>
-        <li style="margin-bottom:8px;"><b>Top N 限制（最多 5 份）</b>：不管多少份文件超過閾值，最多只取前 5 份</li>
-        <li><b>總字數上限（60,000 字）</b>：累計超過就停止加入，預留 AI 思考的 context 空間</li>
-      </ol>
+      <p style="margin-bottom:10px;">隨著文件量增加，過量注入會導致「lost in the middle」效應與 token 成本爆炸。系統設定三層遞進過濾：</p>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:14px;font-size:13px;">
+        <thead>
+          <tr style="background:#f1f5f9;">
+            <th style="text-align:left;padding:8px 12px;border:1px solid #e2e8f0;font-weight:700;width:140px;">護欄</th>
+            <th style="text-align:left;padding:8px 12px;border:1px solid #e2e8f0;font-weight:700;width:80px;">參數</th>
+            <th style="text-align:left;padding:8px 12px;border:1px solid #e2e8f0;font-weight:700;">用途</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;font-weight:600;">相似度閾值</td><td style="padding:8px 12px;border:1px solid #e2e8f0;"><code>0.45</code></td><td style="padding:8px 12px;border:1px solid #e2e8f0;">低於此分數直接捨棄，避免硬塞低相關性文件</td></tr>
+          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;font-weight:600;">Top N 限制</td><td style="padding:8px 12px;border:1px solid #e2e8f0;"><code>5</code></td><td style="padding:8px 12px;border:1px solid #e2e8f0;">最多取前 5 份文件，控制注入廣度</td></tr>
+          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;font-weight:600;">總字數上限</td><td style="padding:8px 12px;border:1px solid #e2e8f0;"><code>60,000</code></td><td style="padding:8px 12px;border:1px solid #e2e8f0;">預留 context window 給對話歷史與生成空間</td></tr>
+        </tbody>
+      </table>
 
-      <!-- 區段 8：快取與失效 -->
+      <!-- 區段 8：快取系統 -->
       <h3 style="font-size:15px;font-weight:800;color:#0f172a;margin:24px 0 12px;display:flex;align-items:center;gap:8px;">
         <span style="background:#0ea5e9;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">8</span>
-        快取與失效機制
+        localStorage 快取結構
       </h3>
-      <ul style="margin:0 0 20px 18px;">
-        <li style="margin-bottom:8px;"><b>文件內容快取</b>：24 小時內不會重新從 Drive 下載</li>
-        <li style="margin-bottom:8px;"><b>向量快取</b>：每個 chunk 帶有內容簽章，內容沒變就不重新 embedding</li>
-        <li style="margin-bottom:8px;"><b>編輯文件後</b>：簽章改變，會自動觸發該文件重新 embedding</li>
-        <li style="margin-bottom:8px;"><b>從 Drive 刪除的文件</b>：下次載入時其向量會被自動清除（孤兒清理）</li>
-        <li><b>強制重建</b>：點「🔄 重新整理文件」會清除所有快取重新載入</li>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:14px;font-size:13px;">
+        <thead>
+          <tr style="background:#f1f5f9;">
+            <th style="text-align:left;padding:8px 12px;border:1px solid #e2e8f0;font-weight:700;width:200px;">Key</th>
+            <th style="text-align:left;padding:8px 12px;border:1px solid #e2e8f0;font-weight:700;">內容</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;"><code>sop_file_cache_v1</code></td><td style="padding:8px 12px;border:1px solid #e2e8f0;">Drive 下載的文件原始內容 + 時間戳，TTL 24h</td></tr>
+          <tr style="background:#fafafa;"><td style="padding:8px 12px;border:1px solid #e2e8f0;"><code>sop_embed_cache</code></td><td style="padding:8px 12px;border:1px solid #e2e8f0;">chunk 索引：<code>{docId, docName, heading, content, vector[768], sig, model}</code></td></tr>
+          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;"><code>sop_embed_model</code></td><td style="padding:8px 12px;border:1px solid #e2e8f0;">當前成功使用的 embedding 模型名稱</td></tr>
+          <tr style="background:#fafafa;"><td style="padding:8px 12px;border:1px solid #e2e8f0;"><code>sop_pinned_ids</code></td><td style="padding:8px 12px;border:1px solid #e2e8f0;">釘選為常駐的文件 ID 陣列</td></tr>
+          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;"><code>sop_apikeys</code> / <code>sop_provider</code> / <code>sop_model</code></td><td style="padding:8px 12px;border:1px solid #e2e8f0;">AI 設定（多 key 陣列 + 當前 provider / model）</td></tr>
+        </tbody>
+      </table>
+
+      <h4 style="font-size:13.5px;font-weight:700;color:#0f172a;margin:16px 0 8px;">內容簽章（Content Signature）</h4>
+      <p style="margin-bottom:8px;font-size:13.5px;">每個 chunk 帶有 <code>sig = content.length + '|' + content.slice(0,20) + '|' + content.slice(-20)</code>，作為輕量級內容指紋。當文件編輯後 sig 改變，<code>isDocIndexed()</code> 會回傳 false，自動觸發 re-embedding。</p>
+
+      <h4 style="font-size:13.5px;font-weight:700;color:#0f172a;margin:16px 0 8px;">失效與清理時機</h4>
+      <ul style="margin:0 0 14px 18px;font-size:13.5px;">
+        <li style="margin-bottom:5px;"><b>內容變更</b>：sig mismatch → 該文件的所有 chunks 重 embed。</li>
+        <li style="margin-bottom:5px;"><b>模型切換</b>：chunk.model 不等於 currentEmbedModel → 視為失效（避免跨向量空間比對）。</li>
+        <li style="margin-bottom:5px;"><b>孤兒清理</b>：每次 <code>embedAllDocs()</code> 開始前先跑 <code>cleanupOrphanedChunks()</code>，刪除 docId 不在當前 sopFiles 中的殘留 chunks。</li>
+        <li style="margin-bottom:5px;"><b>容量爆炸</b>：寫入時捕捉 <code>QuotaExceededError</code>，狀態列警示。</li>
+        <li><b>手動全清</b>：點「🔄 重新整理文件」會同時清除 <code>sop_file_cache_v1</code> 和 <code>sop_embed_cache</code>。</li>
       </ul>
 
-      <!-- 區段 9：Fallback -->
+      <!-- 區段 9：Fallback 策略 -->
       <h3 style="font-size:15px;font-weight:800;color:#0f172a;margin:24px 0 12px;display:flex;align-items:center;gap:8px;">
         <span style="background:#64748b;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">9</span>
-        若語意搜尋失敗會怎樣
+        Fallback 策略
       </h3>
-      <p style="margin-bottom:10px;">以下情況系統會<b>自動退回成「使用所有勾選的文件」</b>的舊行為，確保功能不中斷：</p>
-      <ul style="margin:0 0 20px 18px;">
-        <li style="margin-bottom:6px;">使用 OpenAI 或 Anthropic 作為主要 AI 時（embedding 目前只支援 Gemini）</li>
-        <li style="margin-bottom:6px;">尚未建立任何索引時</li>
-        <li style="margin-bottom:6px;">Embedding API 暫時失敗時</li>
-        <li>沒有任何文件相似度超過 0.45 時</li>
+      <p style="margin-bottom:10px;">語意檢索不可用時自動退回「使用所有勾選文件」的非檢索模式，確保服務不中斷。觸發條件：</p>
+      <ul style="margin:0 0 12px 18px;">
+        <li style="margin-bottom:5px;">當前 chat provider 不是 Gemini（embedding API 僅接 Gemini）</li>
+        <li style="margin-bottom:5px;">沒有設定 API Key</li>
+        <li style="margin-bottom:5px;">embed cache 為空 / 沒有任何 chunk 屬於當前勾選文件</li>
+        <li style="margin-bottom:5px;">所有候選文件分數皆低於 0.45 閾值</li>
+        <li>Query embedding 呼叫拋出例外</li>
       </ul>
+      <p style="margin-bottom:20px;font-size:13px;color:#64748b;">每次回答上方會以 badge 標示本次使用的模式：🟢 <b>語意搜尋</b> 或 🟡 <b>全文模式</b>，點擊可查看相似度分數明細。</p>
 
-      <!-- 區段 10：隱私 -->
+      <!-- 區段 10：UI 元件 -->
       <h3 style="font-size:15px;font-weight:800;color:#0f172a;margin:24px 0 12px;display:flex;align-items:center;gap:8px;">
-        <span style="background:#16a34a;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">10</span>
-        資料流向與隱私
+        <span style="background:#8b5cf6;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">10</span>
+        UI 元件對照
       </h3>
-      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:14px 18px;margin-bottom:14px;font-size:13.5px;">
-        <div style="font-weight:700;color:#15803d;margin-bottom:8px;">會送出瀏覽器的東西</div>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:20px;font-size:13px;">
+        <thead>
+          <tr style="background:#f1f5f9;">
+            <th style="text-align:left;padding:8px 12px;border:1px solid #e2e8f0;font-weight:700;width:140px;">元件</th>
+            <th style="text-align:left;padding:8px 12px;border:1px solid #e2e8f0;font-weight:700;">行為</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;">☑ 勾選框</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">控制 <code>activeFileIds</code>，決定該文件是否進入 retrieval 候選池</td></tr>
+          <tr style="background:#fafafa;"><td style="padding:8px 12px;border:1px solid #e2e8f0;">📌 釘選</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">切換 <code>pinnedFileIds</code>，釘選後該文件無條件注入</td></tr>
+          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;"><span style="color:#10b981;">⚡</span> 綠色閃電</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">此文件向量索引齊全 (<code>isDocIndexed === true</code>)，點擊強制 re-embed</td></tr>
+          <tr style="background:#fafafa;"><td style="padding:8px 12px;border:1px solid #e2e8f0;"><span style="color:#9ca3af;">○</span> 灰色圈</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">尚未建立索引，點擊立即觸發單檔 embedding</td></tr>
+          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;">✏️ 編輯</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">在瀏覽器內編輯內容，存檔走 Drive PATCH API 並背景 re-embed</td></tr>
+          <tr style="background:#fafafa;"><td style="padding:8px 12px;border:1px solid #e2e8f0;">🔍 / 📋 Badge</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">每則回覆上方顯示本次檢索模式與命中文件數，可點擊查看相似度分數</td></tr>
+          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;">狀態列</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">載入進度、索引進度、失敗計數（紅色狀態列可點擊查看 API 錯誤訊息）</td></tr>
+        </tbody>
+      </table>
+
+      <!-- 區段 11：隱私 -->
+      <h3 style="font-size:15px;font-weight:800;color:#0f172a;margin:24px 0 12px;display:flex;align-items:center;gap:8px;">
+        <span style="background:#16a34a;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">11</span>
+        資料流向與隱私邊界
+      </h3>
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:14px 18px;margin-bottom:10px;font-size:13.5px;">
+        <div style="font-weight:700;color:#15803d;margin-bottom:8px;">🌐 會離開瀏覽器的請求</div>
         <ul style="margin:0;padding-left:20px;color:#166534;">
-          <li>送到 <b>Google Drive</b>：你的 OAuth token，用於下載 / 上傳文件</li>
-          <li>送到 <b>Gemini Embedding API</b>：文件內容 chunks（建立索引時）、你的提問</li>
-          <li>送到 <b>Chat API</b>：系統提示 + 命中的文件全文 + 你的問題</li>
+          <li><b>Google Drive API</b>：OAuth token + 文件 ID（請求/上傳檔案內容）</li>
+          <li><b>Gemini Embedding API</b>：文件 chunks（建索引時，每 chunk 一次）、使用者問題（每次提問一次）</li>
+          <li><b>Chat API</b>：system prompt + 注入的文件全文 + 對話歷史 + 當前問題</li>
         </ul>
       </div>
-      <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:14px 18px;margin-bottom:14px;font-size:13.5px;">
-        <div style="font-weight:700;color:#991b1b;margin-bottom:8px;">不會離開瀏覽器的東西</div>
+      <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:14px 18px;margin-bottom:20px;font-size:13.5px;">
+        <div style="font-weight:700;color:#991b1b;margin-bottom:8px;">🔒 永遠不離開瀏覽器</div>
         <ul style="margin:0;padding-left:20px;color:#7f1d1d;">
-          <li>你的 API Keys（只存 localStorage）</li>
-          <li>個人筆記、待辦事項、通訊錄、常用連結</li>
-          <li>向量索引快取</li>
-          <li>對話歷史（重新整理頁面就消失）</li>
+          <li>API Keys（僅存 localStorage）</li>
+          <li>個人筆記 / 待辦事項 / 通訊錄 / 常用連結</li>
+          <li>向量索引快取（chunks 內容雖被送到 embedding API，但向量本身不會再回傳給任何服務）</li>
+          <li>對話歷史（重新整理頁面即清空）</li>
         </ul>
       </div>
 
-      <!-- 區段 11：當前選用的模型 -->
+      <!-- 區段 12：模型 -->
       <h3 style="font-size:15px;font-weight:800;color:#0f172a;margin:24px 0 12px;display:flex;align-items:center;gap:8px;">
-        <span style="background:#a855f7;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">11</span>
+        <span style="background:#a855f7;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">12</span>
         使用的模型
       </h3>
       <ul style="margin:0 0 12px 18px;">
-        <li style="margin-bottom:6px;"><b>Embedding 模型</b>：Gemini <code style="background:#f1f5f9;padding:1px 6px;border-radius:4px;font-size:12px;">gemini-embedding-001</code>（首選，768 維），失敗時自動 fallback 到 <code style="background:#f1f5f9;padding:1px 6px;border-radius:4px;font-size:12px;">text-embedding-004</code></li>
-        <li><b>Chat 模型</b>：依設定，預設 Gemini 2.5 Flash Lite。可在「⚙️ API 設定」中切換</li>
+        <li style="margin-bottom:8px;"><b>Embedding 主模型</b>：<code>gemini-embedding-001</code>（Google AI Studio，免費額度內，768 維 output）</li>
+        <li style="margin-bottom:8px;"><b>Embedding Fallback</b>：<code>gemini-embedding-002</code>（自動觸發於主模型不可用）</li>
+        <li style="margin-bottom:8px;"><b>Chat 預設</b>：<code>gemini-2.5-flash-lite</code>（可在 ⚙️ API 設定切換 Gemini / OpenAI / Anthropic 系列）</li>
+        <li><b>Chat fallback</b>：同 provider 內，當前模型失敗時依模型清單依序重試；多 API key 自動輪替</li>
+      </ul>
+
+      <!-- 區段 13：限制 -->
+      <h3 style="font-size:15px;font-weight:800;color:#0f172a;margin:24px 0 12px;display:flex;align-items:center;gap:8px;">
+        <span style="background:#dc2626;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">13</span>
+        已知限制
+      </h3>
+      <ul style="margin:0 0 20px 18px;font-size:13.5px;">
+        <li style="margin-bottom:6px;"><b>Embedding 僅支援 Gemini</b>：選 OpenAI / Anthropic 為 chat provider 時整套檢索退回 fallback。</li>
+        <li style="margin-bottom:6px;"><b>localStorage 上限約 5MB</b>：大量 / 大型文件可能撞容量上限（系統會在狀態列警示，需點「🔄 重新整理文件」清除）。</li>
+        <li style="margin-bottom:6px;"><b>跨文件依賴</b>：若答案需要綜合多份文件且問題語意只命中其中一份，可能會有資訊缺漏（解法：把參照型文件設為 📌 常駐）。</li>
+        <li style="margin-bottom:6px;"><b>檢索粒度</b>：採文件級注入，因此單份文件過長（&gt; 60,000 字）會直接被字數護欄截斷或排除。</li>
+        <li><b>無使用紀錄</b>：純前端架構無法追蹤誰問了什麼問題（若需 audit log 須加後端）。</li>
       </ul>
 
       <!-- 結尾 -->
@@ -1536,7 +1623,7 @@
   let currentKeyIndex = 0;
 
   const EMBED_CACHE_KEY = 'sop_embed_cache';
-  const EMBED_MODELS = ['gemini-embedding-001', 'text-embedding-004']; // try in order
+  const EMBED_MODELS = ['gemini-embedding-001', 'gemini-embedding-002']; // try in order
   const EMBED_DIMENSIONS = 768;
   const MAX_CONTEXT_CHARS = 60000;
   const SIMILARITY_THRESHOLD = 0.45;
@@ -2176,8 +2263,8 @@
           model: `models/${model}`,
           content: { parts: [{ text: text.slice(0, 3000) }] }
         };
-        // gemini-embedding-001 supports outputDimensionality and taskType; text-embedding-004 ignores them gracefully
-        if (model === 'gemini-embedding-001') {
+        // Newer gemini-embedding-* models support outputDimensionality and taskType
+        if (model.startsWith('gemini-embedding-')) {
           body.outputDimensionality = EMBED_DIMENSIONS;
           if (taskType) body.taskType = taskType;
         }
