@@ -1098,12 +1098,27 @@
           </ul>
         </li>
         <li style="margin-bottom:8px;"><b>內容快取</b>：每份文件下載後寫入 localStorage（key: <code>sop_file_cache_v1</code>），TTL 24 小時，過期或網路失敗會 fallback 到舊快取（degraded mode）。</li>
-        <li><b>觸發索引</b>：載入完成後立即在背景呼叫 <code>embedAllDocs()</code> 建立向量索引。</li>
+        <li><b>觸發索引</b>：載入完成後在背景呼叫 <code>embedAllDocs()</code>，<b>只為使用者勾選（active）的文件建立向量索引</b>。第一次使用時所有文件預設勾選；之後系統會記住前一次的勾選狀態（從 <code>sop_active_ids</code> 還原）。</li>
       </ol>
 
-      <!-- 區段 3：Chunk 切分 -->
+      <!-- 區段 3.0：索引範圍 -->
       <h3 style="font-size:15px;font-weight:800;color:#0f172a;margin:24px 0 12px;display:flex;align-items:center;gap:8px;">
-        <span style="background:#7c5cfc;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">3</span>
+        <span style="background:#0ea5e9;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">3</span>
+        索引範圍：勾選驅動（Checkbox-driven Indexing）
+      </h3>
+      <p style="margin-bottom:10px;">系統採用「<b>勾選 = 建立索引</b>」的設計，讓使用者明確控制哪些文件納入語意搜尋：</p>
+      <ul style="margin:0 0 12px 18px;">
+        <li style="margin-bottom:6px;"><b>勾選一份文件</b> → 立即在背景呼叫 <code>ensureDocEmbedded(file)</code>，計算所有 chunks 的向量並寫入 cache。</li>
+        <li style="margin-bottom:6px;"><b>取消勾選</b> → 立即呼叫 <code>removeDocFromEmbedCache(fileId)</code>，<b>同步刪除該文件所有 chunks</b>（釋放 localStorage 空間）。</li>
+        <li style="margin-bottom:6px;"><b>全選 / 取消全選</b> → 批次套用上述邏輯。</li>
+        <li><b>狀態持久化</b>：勾選狀態寫入 <code>sop_active_ids</code>，跨 session 保留偏好。</li>
+      </ul>
+      <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 16px;margin-bottom:20px;font-size:13px;color:#1e40af;">
+        <b>設計意圖</b>：每位使用者只關心自己工作領域的文件。勾選驅動避免了「全部文件都建索引」造成的容量浪費與搜尋雜訊，使每個瀏覽器只保存個人化的子集索引。</div>
+
+      <!-- 區段 4：Chunk 切分 -->
+      <h3 style="font-size:15px;font-weight:800;color:#0f172a;margin:24px 0 12px;display:flex;align-items:center;gap:8px;">
+        <span style="background:#7c5cfc;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">4</span>
         Chunk 切分策略
       </h3>
       <p style="margin-bottom:10px;">每份文件由 <code>chunkifyDoc()</code> 切成多個 chunks，規則如下：</p>
@@ -1121,7 +1136,7 @@
 
       <!-- 區段 4：Embedding -->
       <h3 style="font-size:15px;font-weight:800;color:#0f172a;margin:24px 0 12px;display:flex;align-items:center;gap:8px;">
-        <span style="background:#7c5cfc;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">4</span>
+        <span style="background:#7c5cfc;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">5</span>
         Embedding 配置
       </h3>
       <table style="width:100%;border-collapse:collapse;margin-bottom:14px;font-size:13px;">
@@ -1141,7 +1156,7 @@
 
       <!-- 區段 5：Retrieval Pipeline -->
       <h3 style="font-size:15px;font-weight:800;color:#0f172a;margin:24px 0 12px;display:flex;align-items:center;gap:8px;">
-        <span style="background:#10b981;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">5</span>
+        <span style="background:#10b981;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">6</span>
         Retrieval Pipeline（提問到回答）
       </h3>
       <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:16px 20px;margin-bottom:14px;font-size:13.5px;">
@@ -1176,7 +1191,7 @@
 
       <!-- 區段 6：常駐文件 -->
       <h3 style="font-size:15px;font-weight:800;color:#0f172a;margin:24px 0 12px;display:flex;align-items:center;gap:8px;">
-        <span style="background:#f59e0b;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">6</span>
+        <span style="background:#f59e0b;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">7</span>
         📌 常駐文件（Pinned Documents）
       </h3>
       <p style="margin-bottom:10px;">某些參照型文件（部門通訊錄、系統路徑速查表、職稱對照表）不管問什麼都可能需要，但其內容雜項過多，文件級向量無法穩定命中。這類文件可以釘選為常駐。</p>
@@ -1188,7 +1203,7 @@
 
       <!-- 區段 7：護欄 -->
       <h3 style="font-size:15px;font-weight:800;color:#0f172a;margin:24px 0 12px;display:flex;align-items:center;gap:8px;">
-        <span style="background:#ef4444;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">7</span>
+        <span style="background:#ef4444;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">8</span>
         三道注入護欄
       </h3>
       <p style="margin-bottom:10px;">隨著文件量增加，過量注入會導致「lost in the middle」效應與 token 成本爆炸。系統設定三層遞進過濾：</p>
@@ -1209,7 +1224,7 @@
 
       <!-- 區段 8：快取系統 -->
       <h3 style="font-size:15px;font-weight:800;color:#0f172a;margin:24px 0 12px;display:flex;align-items:center;gap:8px;">
-        <span style="background:#0ea5e9;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">8</span>
+        <span style="background:#0ea5e9;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">9</span>
         localStorage 快取結構
       </h3>
       <table style="width:100%;border-collapse:collapse;margin-bottom:14px;font-size:13px;">
@@ -1234,31 +1249,32 @@
 
       <h4 style="font-size:13.5px;font-weight:700;color:#0f172a;margin:16px 0 8px;">失效與清理時機</h4>
       <ul style="margin:0 0 14px 18px;font-size:13.5px;">
+        <li style="margin-bottom:5px;"><b>取消勾選</b>：使用者取消勾選文件 → <code>removeDocFromEmbedCache(fileId)</code> 立即刪除該文件所有 chunks。</li>
         <li style="margin-bottom:5px;"><b>內容變更</b>：sig mismatch → 該文件的所有 chunks 重 embed。</li>
         <li style="margin-bottom:5px;"><b>模型切換</b>：chunk.model 不等於 currentEmbedModel → 視為失效（避免跨向量空間比對）。</li>
         <li style="margin-bottom:5px;"><b>孤兒清理</b>：每次 <code>embedAllDocs()</code> 開始前先跑 <code>cleanupOrphanedChunks()</code>，刪除 docId 不在當前 sopFiles 中的殘留 chunks。</li>
-        <li style="margin-bottom:5px;"><b>容量爆炸</b>：寫入時捕捉 <code>QuotaExceededError</code>，狀態列警示。</li>
+        <li style="margin-bottom:5px;"><b>容量爆炸</b>：寫入時捕捉 <code>QuotaExceededError</code>，狀態列警示，提示使用者取消勾選釋放空間。</li>
         <li><b>手動全清</b>：點「🔄 重新整理文件」會同時清除 <code>sop_file_cache_v1</code> 和 <code>sop_embed_cache</code>。</li>
       </ul>
 
       <!-- 區段 9：Fallback 策略 -->
       <h3 style="font-size:15px;font-weight:800;color:#0f172a;margin:24px 0 12px;display:flex;align-items:center;gap:8px;">
-        <span style="background:#64748b;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">9</span>
+        <span style="background:#64748b;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">10</span>
         Fallback 策略
       </h3>
       <p style="margin-bottom:10px;">語意檢索不可用時自動退回「使用所有勾選文件」的非檢索模式，確保服務不中斷。觸發條件：</p>
       <ul style="margin:0 0 12px 18px;">
         <li style="margin-bottom:5px;">當前 chat provider 不是 Gemini（embedding API 僅接 Gemini）</li>
         <li style="margin-bottom:5px;">沒有設定 API Key</li>
-        <li style="margin-bottom:5px;">embed cache 為空 / 沒有任何 chunk 屬於當前勾選文件</li>
+        <li style="margin-bottom:5px;">embed cache 為空（使用者尚未勾選任何文件或索引尚未完成）</li>
         <li style="margin-bottom:5px;">所有候選文件分數皆低於 0.45 閾值</li>
-        <li>Query embedding 呼叫拋出例外</li>
+        <li>Query embedding 呼叫拋出例外（網路、quota、key 失效等）</li>
       </ul>
       <p style="margin-bottom:20px;font-size:13px;color:#64748b;">每次回答上方會以 badge 標示本次使用的模式：🟢 <b>語意搜尋</b> 或 🟡 <b>全文模式</b>，點擊可查看相似度分數明細。</p>
 
       <!-- 區段 10：UI 元件 -->
       <h3 style="font-size:15px;font-weight:800;color:#0f172a;margin:24px 0 12px;display:flex;align-items:center;gap:8px;">
-        <span style="background:#8b5cf6;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">10</span>
+        <span style="background:#8b5cf6;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">11</span>
         UI 元件對照
       </h3>
       <table style="width:100%;border-collapse:collapse;margin-bottom:20px;font-size:13px;">
@@ -1281,7 +1297,7 @@
 
       <!-- 區段 11：隱私 -->
       <h3 style="font-size:15px;font-weight:800;color:#0f172a;margin:24px 0 12px;display:flex;align-items:center;gap:8px;">
-        <span style="background:#16a34a;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">11</span>
+        <span style="background:#16a34a;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">12</span>
         資料流向與隱私邊界
       </h3>
       <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:14px 18px;margin-bottom:10px;font-size:13.5px;">
@@ -1304,7 +1320,7 @@
 
       <!-- 區段 12：模型 -->
       <h3 style="font-size:15px;font-weight:800;color:#0f172a;margin:24px 0 12px;display:flex;align-items:center;gap:8px;">
-        <span style="background:#a855f7;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">12</span>
+        <span style="background:#a855f7;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">13</span>
         使用的模型
       </h3>
       <ul style="margin:0 0 12px 18px;">
@@ -1316,12 +1332,12 @@
 
       <!-- 區段 13：限制 -->
       <h3 style="font-size:15px;font-weight:800;color:#0f172a;margin:24px 0 12px;display:flex;align-items:center;gap:8px;">
-        <span style="background:#dc2626;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">13</span>
+        <span style="background:#dc2626;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">14</span>
         已知限制
       </h3>
       <ul style="margin:0 0 20px 18px;font-size:13.5px;">
         <li style="margin-bottom:6px;"><b>Embedding 僅支援 Gemini</b>：選 OpenAI / Anthropic 為 chat provider 時整套檢索退回 fallback。</li>
-        <li style="margin-bottom:6px;"><b>localStorage 上限約 5MB</b>：大量 / 大型文件可能撞容量上限。系統會在狀態列警示，可透過<b>取消勾選不相關文件</b>即時釋放空間，或點「🔄 重新整理文件」全清重建。</li>
+        <li style="margin-bottom:6px;"><b>localStorage 上限約 5MB</b>：以每份 SOP ~100-200 KB 估算，安全容量約 25-35 份。撞上限時系統會在狀態列警示，可透過<b>取消勾選不相關文件</b>即時釋放空間（勾選驅動索引），或點「🔄 重新整理文件」全清重建。長期超過 40+ 份建議升級到 IndexedDB（容量 50MB+）。</li>
         <li style="margin-bottom:6px;"><b>跨文件依賴</b>：若答案需要綜合多份文件且問題語意只命中其中一份，可能會有資訊缺漏（解法：把參照型文件設為 📌 常駐）。</li>
         <li style="margin-bottom:6px;"><b>檢索粒度</b>：採文件級注入，因此單份文件過長（&gt; 60,000 字）會直接被字數護欄截斷或排除。</li>
         <li><b>無使用紀錄</b>：純前端架構無法追蹤誰問了什麼問題（若需 audit log 須加後端）。</li>
