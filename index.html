@@ -2203,26 +2203,56 @@
 
   async function embedAllDocs() {
     cleanupOrphanedChunks();
-    const filesToEmbed = sopFiles.filter(f => !isDocIndexed(f));
-    if (filesToEmbed.length === 0) {
+    const { provider } = loadSettings();
+    const keys = getApiKeys();
+    const statusEl = document.getElementById('sopStatus');
+
+    if (provider !== 'gemini' || !keys.length) {
+      if (statusEl) {
+        statusEl.textContent = `已載入 ${sopFiles.length} 份文件｜⚠ 語意索引需 Gemini API Key`;
+        statusEl.className = 'sop-status';
+      }
       renderFilesPickerList();
       return;
     }
-    const statusEl = document.getElementById('sopStatus');
-    const originalText = statusEl ? statusEl.textContent : '';
-    const originalClass = statusEl ? statusEl.className : '';
+
+    const filesToEmbed = sopFiles.filter(f => !isDocIndexed(f));
+    if (filesToEmbed.length === 0) {
+      if (statusEl) {
+        statusEl.textContent = `✓ 已載入 ${sopFiles.length} 份文件｜⚡ 已索引 ${sopFiles.length}/${sopFiles.length}`;
+        statusEl.className = 'sop-status loaded';
+      }
+      renderFilesPickerList();
+      return;
+    }
+
     let done = 0;
+    let failed = 0;
     for (const file of filesToEmbed) {
-      if (statusEl && !statusEl.className.includes('error')) {
-        statusEl.textContent = `建立語意索引 ${++done}/${filesToEmbed.length}...`;
+      if (statusEl) {
+        statusEl.textContent = `建立語意索引 ${done + 1}/${filesToEmbed.length}（${file.name.slice(0,12)}...）`;
         statusEl.className = 'sop-status';
-      } else { done++; }
-      await ensureDocEmbedded(file);
+      }
+      try {
+        await ensureDocEmbedded(file);
+        if (!isDocIndexed(file)) failed++;
+      } catch(e) {
+        failed++;
+        console.error(`索引失敗：${file.name}`, e);
+      }
+      done++;
       renderFilesPickerList();
     }
-    if (statusEl && !statusEl.className.includes('error')) {
-      statusEl.textContent = originalText || `✓ 已索引 ${sopFiles.length} 份文件`;
-      statusEl.className = originalClass || 'sop-status loaded';
+
+    if (statusEl) {
+      const indexed = sopFiles.filter(f => isDocIndexed(f)).length;
+      if (failed > 0) {
+        statusEl.textContent = `已載入 ${sopFiles.length} 份｜⚡ 索引 ${indexed}/${sopFiles.length}（${failed} 失敗，按 ○ 重試）`;
+        statusEl.className = 'sop-status error';
+      } else {
+        statusEl.textContent = `✓ 已載入 ${sopFiles.length} 份文件｜⚡ 已索引 ${indexed}/${sopFiles.length}`;
+        statusEl.className = 'sop-status loaded';
+      }
     }
   }
 
@@ -2239,16 +2269,18 @@
     renderFilesPickerList();
   }
 
+  // Stores the last retrieval result so UI can display it
+  let lastRetrievalInfo = null;
+
   async function retrieveRelevantDocIds(query) {
     const { provider } = loadSettings();
-    if (provider !== 'gemini') return null;
+    if (provider !== 'gemini') { lastRetrievalInfo = { mode: 'fallback', reason: '非 Gemini provider' }; return null; }
     const keys = getApiKeys();
-    if (!keys.length) return null;
+    if (!keys.length) { lastRetrievalInfo = { mode: 'fallback', reason: '無 API Key' }; return null; }
 
     const cache = readEmbedCache();
-    // Bug 2 fix: only retrieve from active (checked) files
     const allChunks = Object.values(cache).filter(c => c.vector && activeFileIds.has(c.docId));
-    if (allChunks.length === 0) return null;
+    if (allChunks.length === 0) { lastRetrievalInfo = { mode: 'fallback', reason: '無可用索引' }; return null; }
 
     try {
       const queryVector = await embedText(query, keys[0]);
@@ -2257,12 +2289,20 @@
         const sim = cosineSimilarity(queryVector, chunk.vector);
         if (!docScores[chunk.docId] || sim > docScores[chunk.docId]) docScores[chunk.docId] = sim;
       }
-      return Object.entries(docScores)
-        .filter(([_, s]) => s >= SIMILARITY_THRESHOLD)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, TOP_N_DOCS)
-        .map(([id]) => id);
+      const ranked = Object.entries(docScores).sort((a, b) => b[1] - a[1]);
+      const passed = ranked.filter(([_, s]) => s >= SIMILARITY_THRESHOLD).slice(0, TOP_N_DOCS);
+      lastRetrievalInfo = {
+        mode: passed.length > 0 ? 'semantic' : 'fallback',
+        reason: passed.length === 0 ? '無文件超過相似度閾值' : null,
+        scores: ranked.slice(0, 8).map(([id, s]) => {
+          const f = sopFiles.find(x => x.id === id);
+          return { name: f ? f.name : id, score: s, selected: s >= SIMILARITY_THRESHOLD && passed.findIndex(([pid]) => pid === id) >= 0 };
+        })
+      };
+      console.log('🔍 Retrieval:', lastRetrievalInfo);
+      return passed.map(([id]) => id);
     } catch(e) {
+      lastRetrievalInfo = { mode: 'fallback', reason: 'Embedding API 失敗：' + e.message };
       console.warn('Retrieval failed:', e.message);
       return null;
     }
@@ -2558,6 +2598,31 @@
     }
 
     contentDiv.appendChild(bubble);
+
+    // Retrieval mode badge (only for SOP mode bot replies)
+    if (role === 'bot' && chatMode === 'sop' && lastRetrievalInfo) {
+      const modeBadge = document.createElement('div');
+      const info = lastRetrievalInfo;
+      const isSemantic = info.mode === 'semantic';
+      modeBadge.style.cssText = 'display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;width:fit-content;cursor:pointer;' +
+        (isSemantic
+          ? 'background:#f0fdf4;border:1px solid #bbf7d0;color:#15803d;'
+          : 'background:#fef3c7;border:1px solid #fde68a;color:#92400e;');
+      const selectedCount = isSemantic ? info.scores.filter(s => s.selected).length : 0;
+      modeBadge.innerHTML = isSemantic
+        ? `🔍 語意搜尋 ｜ 命中 ${selectedCount} 份文件 ｜ 點查看分數`
+        : `📋 全文模式 ｜ ${info.reason || '使用所有勾選文件'}`;
+      modeBadge.title = isSemantic ? '點擊查看相似度分數' : (info.reason || '');
+      if (isSemantic && info.scores) {
+        modeBadge.onclick = () => {
+          const lines = info.scores.map(s =>
+            `${s.selected ? '✅' : '❌'} ${s.name}: ${(s.score * 100).toFixed(1)}%`
+          ).join('\n');
+          alert(`語意搜尋結果（門檻 ${(SIMILARITY_THRESHOLD * 100).toFixed(0)}%）\n\n${lines}`);
+        };
+      }
+      contentDiv.appendChild(modeBadge);
+    }
 
     // Source badge
     if (role === 'bot') {
@@ -2893,8 +2958,8 @@
       var pinned = pinnedFileIds.has(f.id);
       var indexed = isDocIndexed(f);
       var pinStyle = pinned
-        ? 'flex-shrink:0;padding:3px 6px;border:1px solid #f59e0b;border-radius:6px;background:#fffbeb;color:#d97706;font-size:12px;cursor:pointer;'
-        : 'flex-shrink:0;padding:3px 6px;border:1px solid #e5e7eb;border-radius:6px;background:transparent;color:#9ca3af;font-size:12px;cursor:pointer;';
+        ? 'flex-shrink:0;padding:3px 6px;border:1.5px solid #f59e0b;border-radius:6px;background:#fffbeb;font-size:12px;cursor:pointer;opacity:1;filter:none;'
+        : 'flex-shrink:0;padding:3px 6px;border:1px dashed #d1d5db;border-radius:6px;background:transparent;font-size:12px;cursor:pointer;opacity:0.35;filter:grayscale(0.7);';
       var indexBadge = indexed
         ? '<button onclick="reindexFile(\'' + f.id + '\')" style="font-size:11px;color:#10b981;flex-shrink:0;background:none;border:none;cursor:pointer;padding:2px;" title="已索引，點擊重新索引">⚡</button>'
         : '<button onclick="reindexFile(\'' + f.id + '\')" style="font-size:11px;color:#d1d5db;flex-shrink:0;background:none;border:none;cursor:pointer;padding:2px;" title="尚未索引，點擊立即索引">○</button>';
