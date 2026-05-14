@@ -1549,9 +1549,17 @@
       const cached = sopFiles.find(f => f.id === currentEditFile.id);
       if (cached) cached.content = content;
 
-      statusEl.textContent = '✓ 已儲存到 Google Drive';
+      statusEl.textContent = '✓ 已儲存到 Google Drive，正在更新索引...';
       statusEl.style.color = '#22c55e';
-      setTimeout(() => { if (statusEl.textContent.startsWith('✓')) statusEl.textContent = ''; }, 4000);
+
+      // Bug 1 fix: re-embed updated content in background
+      ensureDocEmbedded(cached || currentEditFile).then(() => {
+        renderFilesPickerList();
+        if (statusEl.textContent.includes('正在更新索引')) {
+          statusEl.textContent = '✓ 已儲存並更新索引';
+          setTimeout(() => { if (statusEl.textContent.startsWith('✓')) statusEl.textContent = ''; }, 4000);
+        }
+      });
     } catch(e) {
       statusEl.textContent = `❌ ${e.message}`;
       statusEl.style.color = '#ef4444';
@@ -1565,9 +1573,20 @@
 
   function refreshFiles() {
     localStorage.removeItem('sop_file_cache_v1');
+    localStorage.removeItem(EMBED_CACHE_KEY); // Bug 4 fix: also clear embed cache
     const statusEl = document.getElementById('sopStatus');
     if (statusEl) { statusEl.textContent = '快取已清除，重新載入中...'; statusEl.className = 'sop-status'; }
     loadSOPs();
+  }
+
+  function cleanupOrphanedChunks() {
+    const cache = readEmbedCache();
+    const validIds = new Set(sopFiles.map(f => f.id));
+    let removed = 0;
+    for (const key of Object.keys(cache)) {
+      if (!validIds.has(cache[key].docId)) { delete cache[key]; removed++; }
+    }
+    if (removed > 0) { writeEmbedCache(cache); console.log(`清除 ${removed} 個孤兒 chunks`); }
   }
 
   function openSettings() {
@@ -1854,7 +1873,18 @@
     try { return JSON.parse(localStorage.getItem(EMBED_CACHE_KEY) || '{}'); } catch(e) { return {}; }
   }
   function writeEmbedCache(cache) {
-    try { localStorage.setItem(EMBED_CACHE_KEY, JSON.stringify(cache)); } catch(e) {}
+    try {
+      localStorage.setItem(EMBED_CACHE_KEY, JSON.stringify(cache));
+    } catch(e) {
+      console.error('localStorage write failed:', e);
+      if (e.name === 'QuotaExceededError' || /quota/i.test(e.message)) {
+        const statusEl = document.getElementById('sopStatus');
+        if (statusEl) {
+          statusEl.textContent = '⚠ 索引快取已滿，請點「重新載入文件」清理';
+          statusEl.className = 'sop-status error';
+        }
+      }
+    }
   }
 
   function savePinnedIds() {
@@ -1958,9 +1988,40 @@
   }
 
   async function embedAllDocs() {
-    for (const file of sopFiles) {
-      await ensureDocEmbedded(file);
+    cleanupOrphanedChunks();
+    const filesToEmbed = sopFiles.filter(f => !isDocIndexed(f));
+    if (filesToEmbed.length === 0) {
+      renderFilesPickerList();
+      return;
     }
+    const statusEl = document.getElementById('sopStatus');
+    const originalText = statusEl ? statusEl.textContent : '';
+    const originalClass = statusEl ? statusEl.className : '';
+    let done = 0;
+    for (const file of filesToEmbed) {
+      if (statusEl && !statusEl.className.includes('error')) {
+        statusEl.textContent = `建立語意索引 ${++done}/${filesToEmbed.length}...`;
+        statusEl.className = 'sop-status';
+      } else { done++; }
+      await ensureDocEmbedded(file);
+      renderFilesPickerList();
+    }
+    if (statusEl && !statusEl.className.includes('error')) {
+      statusEl.textContent = originalText || `✓ 已索引 ${sopFiles.length} 份文件`;
+      statusEl.className = originalClass || 'sop-status loaded';
+    }
+  }
+
+  async function reindexFile(fileId) {
+    const file = sopFiles.find(f => f.id === fileId);
+    if (!file) return;
+    const cache = readEmbedCache();
+    for (const key of Object.keys(cache)) {
+      if (key.startsWith(file.id + '::')) delete cache[key];
+    }
+    writeEmbedCache(cache);
+    renderFilesPickerList();
+    await ensureDocEmbedded(file);
     renderFilesPickerList();
   }
 
@@ -1971,7 +2032,8 @@
     if (!keys.length) return null;
 
     const cache = readEmbedCache();
-    const allChunks = Object.values(cache).filter(c => c.vector);
+    // Bug 2 fix: only retrieve from active (checked) files
+    const allChunks = Object.values(cache).filter(c => c.vector && activeFileIds.has(c.docId));
     if (allChunks.length === 0) return null;
 
     try {
@@ -2038,7 +2100,8 @@
     if (keys.length === 0) throw new Error('請先在設定中填入 API Key（點左下角 ⚙️）');
 
     const context = await buildContext(userMessage);
-    const systemPrompt = SYSTEM_PROMPT.replace('{context}', context);
+    // Bug 3 fix: use function-form replace to avoid $&/$1/$$ being interpreted as patterns
+    const systemPrompt = SYSTEM_PROMPT.replace('{context}', () => context);
 
     // Build fallback model list: selected model first, then the rest
     const allModels = MODELS[provider] || [model];
@@ -2619,8 +2682,8 @@
         ? 'flex-shrink:0;padding:3px 6px;border:1px solid #f59e0b;border-radius:6px;background:#fffbeb;color:#d97706;font-size:12px;cursor:pointer;'
         : 'flex-shrink:0;padding:3px 6px;border:1px solid #e5e7eb;border-radius:6px;background:transparent;color:#9ca3af;font-size:12px;cursor:pointer;';
       var indexBadge = indexed
-        ? '<span style="font-size:10px;color:#10b981;flex-shrink:0;" title="已建立語意索引">⚡</span>'
-        : '<span style="font-size:10px;color:#d1d5db;flex-shrink:0;" title="尚未索引">○</span>';
+        ? '<button onclick="reindexFile(\'' + f.id + '\')" style="font-size:11px;color:#10b981;flex-shrink:0;background:none;border:none;cursor:pointer;padding:2px;" title="已索引，點擊重新索引">⚡</button>'
+        : '<button onclick="reindexFile(\'' + f.id + '\')" style="font-size:11px;color:#d1d5db;flex-shrink:0;background:none;border:none;cursor:pointer;padding:2px;" title="尚未索引，點擊立即索引">○</button>';
       html += '<div style="display:flex;align-items:center;gap:6px;padding:5px 6px;border-radius:8px;' + (!checked && !pinned ? 'opacity:0.45;' : '') + '"' +
         ' onmouseover="this.style.background=\'#f0f4ff\'" onmouseout="this.style.background=\'transparent\'">' +
         '<input type="checkbox" ' + (checked ? 'checked' : '') + ' onchange="toggleFileActive(\'' + f.id + '\')" style="width:15px;height:15px;flex-shrink:0;cursor:pointer;accent-color:#4f8ef7;" />' +
