@@ -1052,13 +1052,13 @@
       <!-- 一句話總結 -->
       <div style="background:linear-gradient(135deg,#eef2ff,#f5f3ff);border-left:4px solid #6366f1;padding:14px 18px;border-radius:0 10px 10px 0;margin-bottom:24px;">
         <div style="font-size:13px;font-weight:700;color:#4f46e5;margin-bottom:4px;">📌 一句話總結</div>
-        <div style="font-size:14px;color:#1e1b4b;">這個助理會把你的 SOP 文件「拆成小段」進行語意理解，當你提問時，先精準找出答案藏在哪幾份文件，再把整份文件交給 AI 閱讀後回答。<b>所有運算都在你的瀏覽器內進行，沒有後端伺服器。</b></div>
+        <div style="font-size:14px;color:#1e1b4b;">這個助理會把你的 SOP 文件「拆成 chunks」進行語意理解，當你提問時，先精準找出答案藏在哪幾份文件，再把整份文件交給 AI 閱讀後回答。<b>所有運算都在你的瀏覽器內進行，沒有後端伺服器。</b></div>
       </div>
 
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px;">
         <span style="padding:4px 10px;background:#dbeafe;color:#1e40af;border-radius:12px;font-size:11.5px;font-weight:600;">瀏覽器直接運算</span>
         <span style="padding:4px 10px;background:#fef3c7;color:#92400e;border-radius:12px;font-size:11.5px;font-weight:600;">語意搜尋</span>
-        <span style="padding:4px 10px;background:#dcfce7;color:#15803d;border-radius:12px;font-size:11.5px;font-weight:600;">小段搜尋｜整份注入</span>
+        <span style="padding:4px 10px;background:#dcfce7;color:#15803d;border-radius:12px;font-size:11.5px;font-weight:600;">Chunk 搜尋｜整份注入</span>
         <span style="padding:4px 10px;background:#f3e8ff;color:#6b21a8;border-radius:12px;font-size:11.5px;font-weight:600;">勾選驅動索引</span>
         <span style="padding:4px 10px;background:#fee2e2;color:#991b1b;border-radius:12px;font-size:11.5px;font-weight:600;">三道護欄</span>
       </div>
@@ -1071,7 +1071,7 @@
       <p style="margin-bottom:10px;">這個工具是一個靜態網頁，沒有任何後端伺服器。當你打開頁面，瀏覽器會直接跟以下三方服務溝通：</p>
       <ul style="margin:0 0 14px 18px;">
         <li style="margin-bottom:6px;"><b>Google Drive</b>：抓取部門 SOP 資料夾中的文件內容</li>
-        <li style="margin-bottom:6px;"><b>Gemini 語意搜尋服務</b>：把文件和你的提問轉換成「語意指紋」用於比對</li>
+        <li style="margin-bottom:6px;"><b>Gemini 語意搜尋服務</b>：把文件和你的提問轉換成 embedding 用於比對</li>
         <li><b>Gemini 對話服務</b>：根據找到的文件內容生成回答</li>
       </ul>
       <p style="margin-bottom:20px;color:#64748b;font-size:13px;">你的問題、文件、API Key 等資料完全留在你的瀏覽器與這三方服務之間，沒有經過任何「中介伺服器」。</p>
@@ -1109,10 +1109,10 @@
         <span style="background:#7c5cfc;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">4</span>
         文件切分策略
       </h3>
-      <p style="margin-bottom:10px;">每份文件會被切成多個小段（chunk），切分規則：</p>
+      <p style="margin-bottom:10px;">每份文件會被切成多個 chunks，切分規則：</p>
       <ul style="margin:0 0 14px 18px;">
         <li style="margin-bottom:6px;"><b>切點</b>：按文件裡的標題切（一級標題、二級標題、三級標題）。例如「適用對象」「前置準備」「步驟 1」「步驟 2」各成一段。</li>
-        <li style="margin-bottom:6px;"><b>每段帶有標題資訊</b>：系統知道每一小段屬於文件的哪個章節。</li>
+        <li style="margin-bottom:6px;"><b>每個 chunk 帶有標題資訊</b>：系統知道每個 chunk 屬於文件的哪個章節。</li>
         <li style="margin-bottom:6px;"><b>過短才捨棄</b>：少於 3 個字才會被視為空段落丟掉（過去設 30 字，會誤殺「印表機 IP：192.168.1.100」這類短條目，已修正）。</li>
         <li><b>沒有標題的文件</b>：整份視為一個大段落（退化處理）。</li>
       </ul>
@@ -1122,24 +1122,24 @@
         <p style="color:#7c2d12;margin:0;">SOP 文件的「適用對象 / 前置準備 / 步驟 / FAQ」這些段落本身就是完整的語意單位。按標題切剛好對齊語意邊界。固定字數會把同一個步驟切兩半，導致電腦無法理解。</p>
       </div>
 
-      <p style="margin-bottom:20px;font-size:13px;color:#64748b;"><b>單段上限</b>：每段送進語意搜尋前會截到前 3000 字。但這只影響「某一個標題下面內容超過 3000 字」的極端情境，一般 SOP 段落幾百字而已，遠遠不會撞到。</p>
+      <p style="margin-bottom:20px;font-size:13px;color:#64748b;"><b>單段上限</b>：每個 chunk 送進語意搜尋前會截到前 3000 字。但這只影響「某一個標題下面內容超過 3000 字」的極端情境，一般 SOP 段落幾百字而已，遠遠不會撞到。</p>
 
       <!-- 區段 5：Embedding 設定 -->
       <h3 style="font-size:15px;font-weight:800;color:#0f172a;margin:24px 0 12px;display:flex;align-items:center;gap:8px;">
         <span style="background:#7c5cfc;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">5</span>
-        語意指紋（Embedding）配置
+        Embedding 配置
       </h3>
-      <p style="margin-bottom:10px;">所謂「語意指紋」就是把一段文字轉換成 768 個數字組成的陣列。意思相近的文字會有相近的指紋，這就是語意搜尋的基礎。</p>
+      <p style="margin-bottom:10px;">所謂 embedding 就是把一段文字轉換成 768 個數字組成的陣列。意思相近的文字會有相近的 embedding，這就是語意搜尋的基礎。</p>
       <table style="width:100%;border-collapse:collapse;margin-bottom:14px;font-size:13px;">
         <tbody>
           <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:600;width:140px;">主要使用模型</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">gemini-embedding-001（Google 提供，目前免費）</td></tr>
           <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:600;">備援模型</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">gemini-embedding-002（當主模型暫時不能用時自動切換）</td></tr>
-          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:600;">指紋大小</td><td style="padding:8px 12px;border:1px solid #e2e8f0;每段文字 → 768 個數字（兼顧準確度與儲存空間）</td></tr>
+          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:600;">Embedding 大小</td><td style="padding:8px 12px;border:1px solid #e2e8f0;每個 chunk → 768 個數字（兼顧準確度與儲存空間）</td></tr>
           <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:600;">用途標籤</td><td style="padding:8px 12px;border:1px solid #e2e8f0;
-            建立文件指紋時：標示為「文件」模式<br>
-            建立問題指紋時：標示為「查詢」模式<br>
+            建立文件 embedding 時：標示為「文件」模式<br>
+            建立 query embedding 時：標示為「查詢」模式<br>
             <span style="color:#64748b;font-size:12px;">— 這是 Google 推薦的最佳配對，對中文搜尋準確度有明顯提升</span></td></tr>
-          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:600;">單段字數限制</td><td style="padding:8px 12px;border:1px solid #e2e8f0;每段最多取前 3000 字（避免超過 API 限制）</td></tr>
+          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:600;">單段字數限制</td><td style="padding:8px 12px;border:1px solid #e2e8f0;每個 chunk 最多取前 3000 字（避免超過 API 限制）</td></tr>
           <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:600;">速度控制</td><td style="padding:8px 12px;border:1px solid #e2e8f0;每次請求間隔 60 毫秒，避免短時間打太多次被限流</td></tr>
         </tbody>
       </table>
@@ -1151,9 +1151,9 @@
       </h3>
       <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:16px 20px;margin-bottom:14px;font-size:13.5px;">
         <ol style="margin:0;padding-left:20px;">
-          <li style="margin-bottom:8px;"><b>問題轉指紋</b>：你輸入問題後，系統把問題送給 Gemini 算出問題的「語意指紋」。</li>
-          <li style="margin-bottom:8px;"><b>挑選候選池</b>：從你勾選的文件中，取出所有小段的指紋當候選。</li>
-          <li style="margin-bottom:8px;"><b>計算相似度</b>：拿問題指紋跟每個小段比對，給出 0 到 1 之間的相似度分數。</li>
+          <li style="margin-bottom:8px;"><b>問題轉成 embedding</b>：你輸入問題後，系統把問題送給 Gemini 算出問題的 embedding。</li>
+          <li style="margin-bottom:8px;"><b>挑選候選池</b>：從你勾選的文件中，取出所有 chunks 的 embeddings 當候選。</li>
+          <li style="margin-bottom:8px;"><b>計算相似度</b>：拿 query embedding 跟每個 chunk 比對，給出 0 到 1 之間的相似度分數。</li>
           <li style="margin-bottom:8px;"><b>每份文件取最高分</b>：每份文件中相似度最高的那一段代表整份文件的分數。</li>
           <li style="margin-bottom:8px;"><b>套用三道護欄</b>：分數 ≥ 0.45 → 依分數排名 → 最多取前 5 份。</li>
           <li style="margin-bottom:8px;"><b>組合注入內容</b>：先放釘選的常駐文件，再放命中的文件，總字數不超過 60,000 字。</li>
@@ -1162,8 +1162,8 @@
       </div>
 
       <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:10px;padding:14px 18px;margin-bottom:20px;">
-        <div style="font-size:13px;font-weight:700;color:#92400e;margin-bottom:6px;">💡 為什麼用小段搜尋、卻把整份文件交給 AI？</div>
-        <p style="font-size:13px;color:#78350f;margin:0;">小段提供<b>精準定位能力</b>（能在「工作基本資訊」這種雜項型文件中找出其中一條），但 AI 需要文件的<b>完整上下文</b>才能正確回答（例如知道步驟 3 卻不知道步驟 1、2 是什麼）。所以「用小段找、給整份讀」是兩全其美。</p>
+        <div style="font-size:13px;font-weight:700;color:#92400e;margin-bottom:6px;">💡 為什麼用 chunk 搜尋、卻把整份文件交給 AI？</div>
+        <p style="font-size:13px;color:#78350f;margin:0;">chunk 提供<b>精準定位能力</b>（能在「工作基本資訊」這種雜項型文件中找出其中一條），但 AI 需要文件的<b>完整上下文</b>才能正確回答（例如知道步驟 3 卻不知道步驟 1、2 是什麼）。所以「用 chunk 找、給整份讀」是兩全其美。</p>
       </div>
 
       <!-- 區段 7：常駐文件 -->
@@ -1214,7 +1214,7 @@
         </thead>
         <tbody>
           <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;">文件原文快取</td><td style="padding:8px 12px;border:1px solid #e2e8f0;從 Drive 下載的文件內容（24 小時內不再重新下載）</td></tr>
-          <tr style="background:#fafafa;"><td style="padding:8px 12px;border:1px solid #e2e8f0;語意指紋庫</td><td style="padding:8px 12px;border:1px solid #e2e8f0;每個小段的指紋（768 個數字）+ 該段內容 + 章節標題</td></tr>
+          <tr style="background:#fafafa;"><td style="padding:8px 12px;border:1px solid #e2e8f0;embedding cache</td><td style="padding:8px 12px;border:1px solid #e2e8f0;每個 chunk 的 embedding（768 個數字）+ 該段內容 + 章節標題</td></tr>
           <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;當前使用的模型名稱</td><td style="padding:8px 12px;border:1px solid #e2e8f0;記住現在用的是 001 還是 002，避免每次都試錯</td></tr>
           <tr style="background:#fafafa;"><td style="padding:8px 12px;border:1px solid #e2e8f0;釘選清單</td><td style="padding:8px 12px;border:1px solid #e2e8f0;哪些文件被你設為常駐</td></tr>
           <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;勾選清單</td><td style="padding:8px 12px;border:1px solid #e2e8f0;哪些文件被你勾選啟用（重開頁面記得）</td></tr>
@@ -1225,10 +1225,10 @@
 
       <h4 style="font-size:13.5px;font-weight:700;color:#0f172a;margin:16px 0 8px;">什麼時候會自動清理 / 更新？</h4>
       <ul style="margin:0 0 14px 18px;font-size:13.5px;">
-        <li style="margin-bottom:5px;"><b>取消勾選文件</b> → 立刻刪掉這份文件的所有指紋</li>
-        <li style="margin-bottom:5px;"><b>編輯文件後存檔</b> → 系統發現內容變了，自動重新建指紋</li>
-        <li style="margin-bottom:5px;"><b>換 embedding 模型</b> → 舊指紋視為失效（不同模型的指紋無法互相比對），自動重建</li>
-        <li style="margin-bottom:5px;"><b>從 Drive 刪除的文件</b> → 下次載入時系統會發現並清掉殘留指紋</li>
+        <li style="margin-bottom:5px;"><b>取消勾選文件</b> → 立刻刪掉這份文件的所有 embedding</li>
+        <li style="margin-bottom:5px;"><b>編輯文件後存檔</b> → 系統發現內容變了，自動重新建 embedding</li>
+        <li style="margin-bottom:5px;"><b>換 embedding 模型</b> → 舊 embedding 視為失效（不同模型的 embedding 無法互相比對），自動重建</li>
+        <li style="margin-bottom:5px;"><b>從 Drive 刪除的文件</b> → 下次載入時系統會發現並清掉殘留 embedding</li>
         <li style="margin-bottom:5px;"><b>儲存空間滿了</b> → 在側邊狀態列顯示警告，提示你取消勾選釋放空間</li>
         <li><b>點「🔄 重新整理文件」</b> → 全部清除重建</li>
       </ul>
@@ -1263,9 +1263,9 @@
         <tbody>
           <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;">☑ 勾選框</td><td style="padding:8px 12px;border:1px solid #e2e8f0;勾選＝建立索引並納入搜尋；取消勾選＝立刻刪掉索引釋放空間。狀態會記住</td></tr>
           <tr style="background:#fafafa;"><td style="padding:8px 12px;border:1px solid #e2e8f0;📌 釘選</td><td style="padding:8px 12px;border:1px solid #e2e8f0;設為常駐文件，每次提問都會被直接放進參考資料</td></tr>
-          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;"><span style="color:#10b981;">⚡</span> 綠色閃電</td><td style="padding:8px 12px;border:1px solid #e2e8f0;此文件已建立指紋，點擊可強制重建</td></tr>
-          <tr style="background:#fafafa;"><td style="padding:8px 12px;border:1px solid #e2e8f0;"><span style="color:#9ca3af;">○</span> 灰色圈</td><td style="padding:8px 12px;border:1px solid #e2e8f0;尚未建立指紋（可能還在背景處理，或建立失敗）。點擊立即建立</td></tr>
-          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;✏️ 編輯</td><td style="padding:8px 12px;border:1px solid #e2e8f0;在瀏覽器內直接改文件，存檔後自動同步回 Drive 並重新建指紋</td></tr>
+          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;"><span style="color:#10b981;">⚡</span> 綠色閃電</td><td style="padding:8px 12px;border:1px solid #e2e8f0;此文件已建立 embedding，點擊可強制重建</td></tr>
+          <tr style="background:#fafafa;"><td style="padding:8px 12px;border:1px solid #e2e8f0;"><span style="color:#9ca3af;">○</span> 灰色圈</td><td style="padding:8px 12px;border:1px solid #e2e8f0;尚未建立 embedding（可能還在背景處理，或建立失敗）。點擊立即建立</td></tr>
+          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;✏️ 編輯</td><td style="padding:8px 12px;border:1px solid #e2e8f0;在瀏覽器內直接改文件，存檔後自動同步回 Drive 並重新建 embedding</td></tr>
           <tr style="background:#fafafa;"><td style="padding:8px 12px;border:1px solid #e2e8f0;🔍 / 📋 標籤</td><td style="padding:8px 12px;border:1px solid #e2e8f0;每則回答上方顯示本次用的搜尋模式與命中份數，可點擊看分數</td></tr>
           <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;狀態列</td><td style="padding:8px 12px;border:1px solid #e2e8f0;顯示載入進度、索引進度、失敗計數（紅字可點擊看錯誤原因）</td></tr>
         </tbody>
@@ -1280,7 +1280,7 @@
         <div style="font-weight:700;color:#15803d;margin-bottom:8px;">🌐 會離開瀏覽器送出的內容</div>
         <ul style="margin:0;padding-left:20px;color:#166534;">
           <li><b>送到 Google Drive</b>：登入授權 + 文件下載/上傳請求</li>
-          <li><b>送到 Gemini 語意搜尋服務</b>：你勾選的文件內容（建指紋時，每段一次）、你的提問</li>
+          <li><b>送到 Gemini 語意搜尋服務</b>：你勾選的文件內容（建 embedding 時，每個 chunk 一次）、你的提問</li>
           <li><b>送到 Gemini 對話服務</b>：命中的文件全文 + 對話歷史 + 你的問題</li>
         </ul>
       </div>
@@ -1289,7 +1289,7 @@
         <ul style="margin:0;padding-left:20px;color:#7f1d1d;">
           <li>你的 API Keys</li>
           <li>個人筆記 / 待辦 / 通訊錄 / 常用連結</li>
-          <li>語意指紋庫（雖然文件內容被送去算指紋，但指紋本身不會再送給任何服務）</li>
+          <li>embedding cache（雖然文件內容被送去算 embedding，但 embedding 本身不會再送給任何服務）</li>
           <li>對話歷史（重新整理頁面就清空）</li>
         </ul>
       </div>
