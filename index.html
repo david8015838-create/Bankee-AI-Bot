@@ -1224,6 +1224,7 @@
           <tr style="background:#fafafa;"><td style="padding:8px 12px;border:1px solid #e2e8f0;"><code>sop_embed_cache</code></td><td style="padding:8px 12px;border:1px solid #e2e8f0;">chunk 索引：<code>{docId, docName, heading, content, vector[768], sig, model}</code></td></tr>
           <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;"><code>sop_embed_model</code></td><td style="padding:8px 12px;border:1px solid #e2e8f0;">當前成功使用的 embedding 模型名稱</td></tr>
           <tr style="background:#fafafa;"><td style="padding:8px 12px;border:1px solid #e2e8f0;"><code>sop_pinned_ids</code></td><td style="padding:8px 12px;border:1px solid #e2e8f0;">釘選為常駐的文件 ID 陣列</td></tr>
+          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;"><code>sop_active_ids</code></td><td style="padding:8px 12px;border:1px solid #e2e8f0;">使用者勾選為「啟用」的文件 ID 陣列（決定哪些文件要索引 + 被搜尋）</td></tr>
           <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;"><code>sop_apikeys</code> / <code>sop_provider</code> / <code>sop_model</code></td><td style="padding:8px 12px;border:1px solid #e2e8f0;">AI 設定（多 key 陣列 + 當前 provider / model）</td></tr>
         </tbody>
       </table>
@@ -1268,7 +1269,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;">☑ 勾選框</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">控制 <code>activeFileIds</code>，決定該文件是否進入 retrieval 候選池</td></tr>
+          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;">☑ 勾選框</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">控制 <code>activeFileIds</code>，<b>勾選時自動建立索引、取消勾選時即時刪除索引</b>（釋放 localStorage 空間）。同時決定是否進入 retrieval 候選池。狀態會持久化到 <code>sop_active_ids</code></td></tr>
           <tr style="background:#fafafa;"><td style="padding:8px 12px;border:1px solid #e2e8f0;">📌 釘選</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">切換 <code>pinnedFileIds</code>，釘選後該文件無條件注入</td></tr>
           <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;"><span style="color:#10b981;">⚡</span> 綠色閃電</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">此文件向量索引齊全 (<code>isDocIndexed === true</code>)，點擊強制 re-embed</td></tr>
           <tr style="background:#fafafa;"><td style="padding:8px 12px;border:1px solid #e2e8f0;"><span style="color:#9ca3af;">○</span> 灰色圈</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">尚未建立索引，點擊立即觸發單檔 embedding</td></tr>
@@ -1320,7 +1321,7 @@
       </h3>
       <ul style="margin:0 0 20px 18px;font-size:13.5px;">
         <li style="margin-bottom:6px;"><b>Embedding 僅支援 Gemini</b>：選 OpenAI / Anthropic 為 chat provider 時整套檢索退回 fallback。</li>
-        <li style="margin-bottom:6px;"><b>localStorage 上限約 5MB</b>：大量 / 大型文件可能撞容量上限（系統會在狀態列警示，需點「🔄 重新整理文件」清除）。</li>
+        <li style="margin-bottom:6px;"><b>localStorage 上限約 5MB</b>：大量 / 大型文件可能撞容量上限。系統會在狀態列警示，可透過<b>取消勾選不相關文件</b>即時釋放空間，或點「🔄 重新整理文件」全清重建。</li>
         <li style="margin-bottom:6px;"><b>跨文件依賴</b>：若答案需要綜合多份文件且問題語意只命中其中一份，可能會有資訊缺漏（解法：把參照型文件設為 📌 常駐）。</li>
         <li style="margin-bottom:6px;"><b>檢索粒度</b>：採文件級注入，因此單份文件過長（&gt; 60,000 字）會直接被字數護欄截斷或排除。</li>
         <li><b>無使用紀錄</b>：純前端架構無法追蹤誰問了什麼問題（若需 audit log 須加後端）。</li>
@@ -1616,6 +1617,7 @@
   let sopFiles = [];
   let activeFileIds = new Set();
   let pinnedFileIds = new Set(JSON.parse(localStorage.getItem('sop_pinned_ids') || '[]'));
+  const SAVED_ACTIVE_IDS = JSON.parse(localStorage.getItem('sop_active_ids') || 'null');
   let conversationHistory = [];
   let freeChatHistory = [];
   let chatMode = 'sop';
@@ -2061,11 +2063,17 @@
         }
       }
 
-      // All files active by default
-      activeFileIds = new Set(sopFiles.map(f => f.id));
+      // Restore active selection from previous session, or default to all
+      if (SAVED_ACTIVE_IDS && Array.isArray(SAVED_ACTIVE_IDS)) {
+        const validSaved = SAVED_ACTIVE_IDS.filter(id => sopFiles.some(f => f.id === id));
+        activeFileIds = new Set(validSaved.length > 0 ? validSaved : sopFiles.map(f => f.id));
+      } else {
+        activeFileIds = new Set(sopFiles.map(f => f.id));
+      }
+      saveActiveIds();
       renderFilesPickerList();
       updateActiveStatus();
-      embedAllDocs(); // background: build chunk-level index
+      embedAllDocs(); // background: only embeds active files
 
     } catch (e) {
       console.error(e);
@@ -2353,10 +2361,12 @@
       return;
     }
 
-    const filesToEmbed = sopFiles.filter(f => !isDocIndexed(f));
+    // Only embed files the user has checked (active)
+    const activeFiles = sopFiles.filter(f => activeFileIds.has(f.id));
+    const filesToEmbed = activeFiles.filter(f => !isDocIndexed(f));
     if (filesToEmbed.length === 0) {
       if (statusEl) {
-        statusEl.textContent = `✓ 已載入 ${sopFiles.length} 份文件｜⚡ 已索引 ${sopFiles.length}/${sopFiles.length}`;
+        statusEl.textContent = `✓ 已載入 ${sopFiles.length} 份文件｜⚡ 已索引 ${activeFiles.length}（勾選的全數完成）`;
         statusEl.className = 'sop-status loaded';
       }
       renderFilesPickerList();
@@ -2384,9 +2394,9 @@
     }
 
     if (statusEl) {
-      const indexed = sopFiles.filter(f => isDocIndexed(f)).length;
+      const indexed = activeFiles.filter(f => isDocIndexed(f)).length;
       if (failed > 0) {
-        statusEl.textContent = `已載入 ${sopFiles.length} 份｜⚡ 索引 ${indexed}/${sopFiles.length}（${failed} 失敗，點查看原因）`;
+        statusEl.textContent = `已載入 ${sopFiles.length} 份｜⚡ 索引 ${indexed}/${activeFiles.length}（${failed} 失敗，點查看原因）`;
         statusEl.className = 'sop-status error';
         statusEl.style.cursor = 'pointer';
         statusEl.title = lastEmbedError || '未知錯誤';
@@ -2403,7 +2413,7 @@
           );
         };
       } else {
-        statusEl.textContent = `✓ 已載入 ${sopFiles.length} 份文件｜⚡ 已索引 ${indexed}/${sopFiles.length}`;
+        statusEl.textContent = `✓ 已載入 ${sopFiles.length} 份文件｜⚡ 已索引 ${indexed}（勾選的全數完成）`;
         statusEl.className = 'sop-status loaded';
         statusEl.style.cursor = 'default';
         statusEl.onclick = null;
@@ -3060,24 +3070,62 @@
   function openFilesPicker() { document.getElementById('filesPickerModal').classList.add('active'); }
   function closeFilesPicker() { document.getElementById('filesPickerModal').classList.remove('active'); }
 
-  function toggleFileActive(fileId) {
-    if (activeFileIds.has(fileId)) {
-      activeFileIds.delete(fileId);
-    } else {
-      activeFileIds.add(fileId);
-    }
-    updateActiveStatus();
-    renderFilesPickerList();
+  function saveActiveIds() {
+    try { localStorage.setItem('sop_active_ids', JSON.stringify([...activeFileIds])); } catch(e) {}
   }
 
-  function toggleAllFiles(selectAll) {
+  function removeDocFromEmbedCache(fileId) {
+    const cache = readEmbedCache();
+    let changed = false;
+    for (const key of Object.keys(cache)) {
+      if (cache[key].docId === fileId) { delete cache[key]; changed = true; }
+    }
+    if (changed) writeEmbedCache(cache);
+  }
+
+  async function toggleFileActive(fileId) {
+    const wasActive = activeFileIds.has(fileId);
+    if (wasActive) {
+      activeFileIds.delete(fileId);
+      removeDocFromEmbedCache(fileId);
+      saveActiveIds();
+      updateActiveStatus();
+      renderFilesPickerList();
+    } else {
+      activeFileIds.add(fileId);
+      saveActiveIds();
+      updateActiveStatus();
+      renderFilesPickerList();
+      // Background: build index for newly checked file
+      const file = sopFiles.find(f => f.id === fileId);
+      if (file) {
+        await ensureDocEmbedded(file);
+        renderFilesPickerList();
+      }
+    }
+  }
+
+  async function toggleAllFiles(selectAll) {
     if (selectAll) {
       activeFileIds = new Set(sopFiles.map(f => f.id));
+      saveActiveIds();
+      updateActiveStatus();
+      renderFilesPickerList();
+      embedAllDocs();
     } else {
+      // Remove all index entries for all files
+      const cache = readEmbedCache();
+      for (const id of activeFileIds) {
+        for (const key of Object.keys(cache)) {
+          if (cache[key].docId === id) delete cache[key];
+        }
+      }
+      writeEmbedCache(cache);
       activeFileIds.clear();
+      saveActiveIds();
+      updateActiveStatus();
+      renderFilesPickerList();
     }
-    updateActiveStatus();
-    renderFilesPickerList();
   }
 
   function updateActiveStatus() {
@@ -3106,8 +3154,13 @@
       return;
     }
     var allSelected = activeFileIds.size === sopFiles.length;
-    var html = '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px 10px;border-bottom:1px solid #f0f2f5;margin-bottom:4px;">' +
-      '<span style="font-size:11px;color:#9ca3af;">勾選後 AI 只根據選取的文件回答</span>' +
+    var html = '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;margin:0 0 10px 0;font-size:12px;color:#92400e;line-height:1.6;">' +
+      '💡 <b>使用建議</b>：請只勾選與你工作相關的文件。<br>' +
+      '<span style="color:#a16207;">• 取消勾選會即時刪除該文件的索引，<b>釋放瀏覽器儲存空間</b></span><br>' +
+      '<span style="color:#a16207;">• 文件越聚焦，AI 搜尋越精準，回答品質越好</span>' +
+      '</div>' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px 10px;border-bottom:1px solid #f0f2f5;margin-bottom:4px;">' +
+      '<span style="font-size:11px;color:#9ca3af;">勾選 = 建立索引 + 納入搜尋</span>' +
       '<button onclick="toggleAllFiles(' + (!allSelected) + ')" style="font-size:11px;color:#4f8ef7;background:none;border:none;cursor:pointer;font-weight:500;padding:2px 6px;">' +
       (allSelected ? '取消全選' : '全選') + '</button></div>';
     for (var i = 0; i < sopFiles.length; i++) {
