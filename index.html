@@ -1134,13 +1134,13 @@
         <tbody>
           <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:600;width:140px;">主要使用模型</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">gemini-embedding-001（Google 提供，目前免費）</td></tr>
           <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:600;">備援模型</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">gemini-embedding-002（當主模型暫時不能用時自動切換）</td></tr>
-          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:600;">Embedding 大小</td><td style="padding:8px 12px;border:1px solid #e2e8f0;每個 chunk → 768 個數字（兼顧準確度與儲存空間）</td></tr>
-          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:600;">用途標籤</td><td style="padding:8px 12px;border:1px solid #e2e8f0;
+          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:600;">Embedding 大小</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">每個 chunk → 768 個數字（兼顧準確度與儲存空間）</td></tr>
+          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:600;">用途標籤</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">
             建立文件 embedding 時：標示為「文件」模式<br>
             建立 query embedding 時：標示為「查詢」模式<br>
             <span style="color:#64748b;font-size:12px;">— 這是 Google 推薦的最佳配對，對中文搜尋準確度有明顯提升</span></td></tr>
-          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:600;">單段字數限制</td><td style="padding:8px 12px;border:1px solid #e2e8f0;每個 chunk 最多取前 3000 字（避免超過 API 限制）</td></tr>
-          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:600;">速度控制</td><td style="padding:8px 12px;border:1px solid #e2e8f0;每次請求間隔 60 毫秒，避免短時間打太多次被限流</td></tr>
+          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:600;">單段字數限制</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">每個 chunk 最多取前 3000 字（避免超過 API 限制）</td></tr>
+          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:600;">速度控制</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">每次請求間隔 60 毫秒，避免短時間打太多次被限流</td></tr>
         </tbody>
       </table>
 
@@ -1193,9 +1193,9 @@
           </tr>
         </thead>
         <tbody>
-          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;font-weight:600;">相似度門檻</td><td style="padding:8px 12px;border:1px solid #e2e8f0;0.45</td><td style="padding:8px 12px;border:1px solid #e2e8f0;低於這分數的文件直接捨棄，避免硬塞低相關性內容</td></tr>
-          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;font-weight:600;">最多份數</td><td style="padding:8px 12px;border:1px solid #e2e8f0;5</td><td style="padding:8px 12px;border:1px solid #e2e8f0;不管多少份超過門檻，最多取前 5 份</td></tr>
-          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;font-weight:600;">總字數上限</td><td style="padding:8px 12px;border:1px solid #e2e8f0;60,000</td><td style="padding:8px 12px;border:1px solid #e2e8f0;預留 AI 思考與對話歷史的空間</td></tr>
+          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;font-weight:600;">相似度門檻</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">0.45</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">低於這分數的文件直接捨棄，避免硬塞低相關性內容</td></tr>
+          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;font-weight:600;">最多份數</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">5</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">不管多少份超過門檻，最多取前 5 份</td></tr>
+          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;font-weight:600;">總字數上限</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">60,000</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">預留 AI 思考與對話歷史的空間</td></tr>
         </tbody>
       </table>
 
@@ -1213,13 +1213,13 @@
           </tr>
         </thead>
         <tbody>
-          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;">文件原文快取</td><td style="padding:8px 12px;border:1px solid #e2e8f0;從 Drive 下載的文件內容（24 小時內不再重新下載）</td></tr>
-          <tr style="background:#fafafa;"><td style="padding:8px 12px;border:1px solid #e2e8f0;embedding cache</td><td style="padding:8px 12px;border:1px solid #e2e8f0;每個 chunk 的 embedding（768 個數字）+ 該段內容 + 章節標題</td></tr>
-          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;當前使用的模型名稱</td><td style="padding:8px 12px;border:1px solid #e2e8f0;記住現在用的是 001 還是 002，避免每次都試錯</td></tr>
-          <tr style="background:#fafafa;"><td style="padding:8px 12px;border:1px solid #e2e8f0;釘選清單</td><td style="padding:8px 12px;border:1px solid #e2e8f0;哪些文件被你設為常駐</td></tr>
-          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;勾選清單</td><td style="padding:8px 12px;border:1px solid #e2e8f0;哪些文件被你勾選啟用（重開頁面記得）</td></tr>
-          <tr style="background:#fafafa;"><td style="padding:8px 12px;border:1px solid #e2e8f0;API 設定</td><td style="padding:8px 12px;border:1px solid #e2e8f0;你的 API Keys、選用的服務商、模型</td></tr>
-          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;個人工具資料</td><td style="padding:8px 12px;border:1px solid #e2e8f0;筆記、待辦、通訊錄、常用連結</td></tr>
+          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;">文件原文快取</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">從 Drive 下載的文件內容（24 小時內不再重新下載）</td></tr>
+          <tr style="background:#fafafa;"><td style="padding:8px 12px;border:1px solid #e2e8f0;">embedding cache</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">每個 chunk 的 embedding（768 個數字）+ 該段內容 + 章節標題</td></tr>
+          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;">當前使用的模型名稱</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">記住現在用的是 001 還是 002，避免每次都試錯</td></tr>
+          <tr style="background:#fafafa;"><td style="padding:8px 12px;border:1px solid #e2e8f0;">釘選清單</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">哪些文件被你設為常駐</td></tr>
+          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;">勾選清單</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">哪些文件被你勾選啟用（重開頁面記得）</td></tr>
+          <tr style="background:#fafafa;"><td style="padding:8px 12px;border:1px solid #e2e8f0;">API 設定</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">你的 API Keys、選用的服務商、模型</td></tr>
+          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;">個人工具資料</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">筆記、待辦、通訊錄、常用連結</td></tr>
         </tbody>
       </table>
 
@@ -1261,13 +1261,13 @@
           </tr>
         </thead>
         <tbody>
-          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;">☑ 勾選框</td><td style="padding:8px 12px;border:1px solid #e2e8f0;勾選＝建立索引並納入搜尋；取消勾選＝立刻刪掉索引釋放空間。狀態會記住</td></tr>
-          <tr style="background:#fafafa;"><td style="padding:8px 12px;border:1px solid #e2e8f0;📌 釘選</td><td style="padding:8px 12px;border:1px solid #e2e8f0;設為常駐文件，每次提問都會被直接放進參考資料</td></tr>
-          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;"><span style="color:#10b981;">⚡</span> 綠色閃電</td><td style="padding:8px 12px;border:1px solid #e2e8f0;此文件已建立 embedding，點擊可強制重建</td></tr>
-          <tr style="background:#fafafa;"><td style="padding:8px 12px;border:1px solid #e2e8f0;"><span style="color:#9ca3af;">○</span> 灰色圈</td><td style="padding:8px 12px;border:1px solid #e2e8f0;尚未建立 embedding（可能還在背景處理，或建立失敗）。點擊立即建立</td></tr>
-          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;✏️ 編輯</td><td style="padding:8px 12px;border:1px solid #e2e8f0;在瀏覽器內直接改文件，存檔後自動同步回 Drive 並重新建 embedding</td></tr>
-          <tr style="background:#fafafa;"><td style="padding:8px 12px;border:1px solid #e2e8f0;🔍 / 📋 標籤</td><td style="padding:8px 12px;border:1px solid #e2e8f0;每則回答上方顯示本次用的搜尋模式與命中份數，可點擊看分數</td></tr>
-          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;狀態列</td><td style="padding:8px 12px;border:1px solid #e2e8f0;顯示載入進度、索引進度、失敗計數（紅字可點擊看錯誤原因）</td></tr>
+          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;">☑ 勾選框</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">勾選＝建立索引並納入搜尋；取消勾選＝立刻刪掉索引釋放空間。狀態會記住</td></tr>
+          <tr style="background:#fafafa;"><td style="padding:8px 12px;border:1px solid #e2e8f0;">📌 釘選</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">設為常駐文件，每次提問都會被直接放進參考資料</td></tr>
+          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;"><span style="color:#10b981;">⚡</span> 綠色閃電</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">此文件已建立 embedding，點擊可強制重建</td></tr>
+          <tr style="background:#fafafa;"><td style="padding:8px 12px;border:1px solid #e2e8f0;"><span style="color:#9ca3af;">○</span> 灰色圈</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">尚未建立 embedding（可能還在背景處理，或建立失敗）。點擊立即建立</td></tr>
+          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;">✏️ 編輯</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">在瀏覽器內直接改文件，存檔後自動同步回 Drive 並重新建 embedding</td></tr>
+          <tr style="background:#fafafa;"><td style="padding:8px 12px;border:1px solid #e2e8f0;">🔍 / 📋 標籤</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">每則回答上方顯示本次用的搜尋模式與命中份數，可點擊看分數</td></tr>
+          <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;">狀態列</td><td style="padding:8px 12px;border:1px solid #e2e8f0;">顯示載入進度、索引進度、失敗計數（紅字可點擊看錯誤原因）</td></tr>
         </tbody>
       </table>
 
