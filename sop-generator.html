@@ -1749,7 +1749,13 @@ function generateSopMd() {
       lines.push(`### 步驟 ${i+1}：${s.name || '（未命名）'}`);
       if (s.who) lines.push(`- **執行人**：${s.who}`);
       if (s.where) lines.push(`- **操作位置**：${s.where}`);
-      if (s.action) lines.push(`- **具體動作**：${s.action}`);
+      if (s.action) {
+        const actionLines = s.action.split('\n');
+        lines.push(`- **具體動作**：${actionLines[0]}`);
+        for (let j = 1; j < actionLines.length; j++) {
+          if (actionLines[j].trim()) lines.push(`  ${actionLines[j]}`);
+        }
+      }
       if (s.done) lines.push(`- **完成指標**：${s.done}`);
       if (s.note) lines.push(`- **注意事項**：${s.note}`);
       lines.push('');
@@ -1766,7 +1772,7 @@ function generateSopMd() {
     cases.forEach(c => {
       if (!c.problem) return;
       lines.push(`**狀況：${c.problem}**`);
-      lines.push(`解決方法：${c.solution || '（待補充）'}`);
+      if (c.solution) lines.push(`解決方法：${c.solution}`);
       lines.push('');
     });
   } else {
@@ -1776,11 +1782,11 @@ function generateSopMd() {
   lines.push('---');
   lines.push('');
   lines.push('## 常見問題 FAQ');
-  const faqs = (s5.faqs || []).filter(f => f.q);
+  const faqs = (s5.faqs || []).filter(f => f.q && f.a);
   if (faqs.length) {
     faqs.forEach(f => {
       lines.push(`**Q：${f.q}**`);
-      lines.push(`A：${f.a || '（待補充）'}`);
+      lines.push(`A：${f.a}`);
       lines.push('');
     });
   } else {
@@ -1834,11 +1840,11 @@ function generateRefMd() {
   lines.push('');
   lines.push('## 常見問題 FAQ');
   lines.push('');
-  const faqs = (r2.faqs || []).filter(f => f.q);
+  const faqs = (r2.faqs || []).filter(f => f.q && f.a);
   if (faqs.length) {
     faqs.forEach(f => {
       lines.push(`**Q：${f.q}**`);
-      lines.push(`A：${f.a || '（待補充）'}`);
+      lines.push(`A：${f.a}`);
       lines.push('');
     });
   } else {
