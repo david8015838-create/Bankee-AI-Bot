@@ -1313,12 +1313,19 @@
   // STATE
   // ═══════════════════════════════════════
   let sopFiles = [];
-  let activeFileIds = new Set(); // which files AI uses; empty = all
+  let activeFileIds = new Set();
+  let pinnedFileIds = new Set(JSON.parse(localStorage.getItem('sop_pinned_ids') || '[]'));
   let conversationHistory = [];
   let freeChatHistory = [];
-  let chatMode = 'sop'; // 'sop' | 'free'
+  let chatMode = 'sop';
   let isLoading = false;
   let currentKeyIndex = 0;
+
+  const EMBED_CACHE_KEY = 'sop_embed_cache';
+  const EMBED_MODEL = 'text-embedding-004';
+  const MAX_CONTEXT_CHARS = 60000;
+  const SIMILARITY_THRESHOLD = 0.45;
+  const TOP_N_DOCS = 5;
 
   // ═══════════════════════════════════════
   // SETTINGS
@@ -1736,6 +1743,7 @@
       activeFileIds = new Set(sopFiles.map(f => f.id));
       renderFilesPickerList();
       updateActiveStatus();
+      embedAllDocs(); // background: build chunk-level index
 
     } catch (e) {
       console.error(e);
@@ -1838,11 +1846,179 @@
     return sections.join('\n\n');
   }
 
-  function buildContext() {
-    const active = sopFiles.filter(f => activeFileIds.has(f.id));
-    const sopContext = active.length === 0
+  // ═══════════════════════════════════════
+  // EMBEDDING & RETRIEVAL
+  // ═══════════════════════════════════════
+
+  function readEmbedCache() {
+    try { return JSON.parse(localStorage.getItem(EMBED_CACHE_KEY) || '{}'); } catch(e) { return {}; }
+  }
+  function writeEmbedCache(cache) {
+    try { localStorage.setItem(EMBED_CACHE_KEY, JSON.stringify(cache)); } catch(e) {}
+  }
+
+  function savePinnedIds() {
+    localStorage.setItem('sop_pinned_ids', JSON.stringify([...pinnedFileIds]));
+  }
+
+  function togglePin(fileId) {
+    if (pinnedFileIds.has(fileId)) pinnedFileIds.delete(fileId);
+    else pinnedFileIds.add(fileId);
+    savePinnedIds();
+    renderFilesPickerList();
+  }
+
+  function contentSignature(content) {
+    return content.length + '|' + content.slice(0, 20) + '|' + content.slice(-20);
+  }
+
+  function isDocIndexed(file) {
+    const cache = readEmbedCache();
+    const sig = contentSignature(file.content);
+    return Object.values(cache).some(c => c.docId === file.id && c.sig === sig);
+  }
+
+  function chunkifyDoc(content, docId, docName) {
+    const chunks = [];
+    const lines = content.split('\n');
+    let currentHeading = docName;
+    let currentLines = [];
+
+    const flush = () => {
+      const text = currentLines.join('\n').trim();
+      if (text.length > 30) {
+        chunks.push({ id: `${docId}::${chunks.length}`, docId, docName, heading: currentHeading, content: text });
+      }
+      currentLines = [];
+    };
+
+    for (const line of lines) {
+      if (/^#{1,3} /.test(line) && currentLines.length > 0) {
+        flush();
+        currentHeading = line.replace(/^#+\s+/, '');
+      }
+      currentLines.push(line);
+    }
+    flush();
+
+    if (chunks.length === 0 && content.trim().length > 0) {
+      chunks.push({ id: `${docId}::0`, docId, docName, heading: docName, content: content.trim() });
+    }
+    return chunks;
+  }
+
+  function cosineSimilarity(a, b) {
+    let dot = 0, normA = 0, normB = 0;
+    for (let i = 0; i < a.length; i++) {
+      dot += a[i] * b[i]; normA += a[i] * a[i]; normB += b[i] * b[i];
+    }
+    return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+  }
+
+  async function embedText(text, apiKey) {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${EMBED_MODEL}:embedContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: `models/${EMBED_MODEL}`, content: { parts: [{ text: text.slice(0, 3000) }] } })
+      }
+    );
+    if (!res.ok) throw new Error('Embedding API 錯誤');
+    const data = await res.json();
+    return data.embedding.values;
+  }
+
+  async function ensureDocEmbedded(file) {
+    const { provider } = loadSettings();
+    if (provider !== 'gemini') return;
+    const keys = getApiKeys();
+    if (!keys.length) return;
+
+    const cache = readEmbedCache();
+    const sig = contentSignature(file.content);
+    const chunks = chunkifyDoc(file.content, file.id, file.name);
+    const allCached = chunks.every(c => cache[c.id] && cache[c.id].sig === sig);
+    if (allCached) return;
+
+    for (const key of Object.keys(cache)) {
+      if (key.startsWith(file.id + '::')) delete cache[key];
+    }
+
+    for (const chunk of chunks) {
+      try {
+        const vector = await embedText(chunk.content, keys[0]);
+        cache[chunk.id] = { ...chunk, vector, sig };
+        await new Promise(r => setTimeout(r, 60));
+      } catch(e) {
+        console.warn(`Embed failed: ${chunk.id}`, e.message);
+      }
+    }
+    writeEmbedCache(cache);
+  }
+
+  async function embedAllDocs() {
+    for (const file of sopFiles) {
+      await ensureDocEmbedded(file);
+    }
+    renderFilesPickerList();
+  }
+
+  async function retrieveRelevantDocIds(query) {
+    const { provider } = loadSettings();
+    if (provider !== 'gemini') return null;
+    const keys = getApiKeys();
+    if (!keys.length) return null;
+
+    const cache = readEmbedCache();
+    const allChunks = Object.values(cache).filter(c => c.vector);
+    if (allChunks.length === 0) return null;
+
+    try {
+      const queryVector = await embedText(query, keys[0]);
+      const docScores = {};
+      for (const chunk of allChunks) {
+        const sim = cosineSimilarity(queryVector, chunk.vector);
+        if (!docScores[chunk.docId] || sim > docScores[chunk.docId]) docScores[chunk.docId] = sim;
+      }
+      return Object.entries(docScores)
+        .filter(([_, s]) => s >= SIMILARITY_THRESHOLD)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, TOP_N_DOCS)
+        .map(([id]) => id);
+    } catch(e) {
+      console.warn('Retrieval failed:', e.message);
+      return null;
+    }
+  }
+
+  async function buildContext(query) {
+    const pinned = sopFiles.filter(f => pinnedFileIds.has(f.id));
+    const pinnedSet = new Set(pinned.map(f => f.id));
+    let relevant = [];
+
+    if (query && query.trim()) {
+      const ids = await retrieveRelevantDocIds(query);
+      if (ids && ids.length > 0) {
+        relevant = ids.filter(id => !pinnedSet.has(id)).map(id => sopFiles.find(f => f.id === id)).filter(Boolean);
+      }
+    }
+
+    if (relevant.length === 0) {
+      relevant = sopFiles.filter(f => activeFileIds.has(f.id) && !pinnedSet.has(f.id));
+    }
+
+    let totalChars = 0;
+    const selected = [];
+    for (const doc of [...pinned, ...relevant]) {
+      if (totalChars + doc.content.length > MAX_CONTEXT_CHARS) break;
+      selected.push(doc);
+      totalChars += doc.content.length;
+    }
+
+    const sopContext = selected.length === 0
       ? '（目前沒有選取任何 SOP 文件）'
-      : active.map(f => `=== 文件：${f.name} ===\n${f.content}`).join('\n\n---\n\n');
+      : selected.map(f => `=== 文件：${f.name} ===\n${f.content}`).join('\n\n---\n\n');
 
     const personalContext = buildPersonalContext();
     if (!personalContext) return sopContext;
@@ -1861,7 +2037,7 @@
     const keys = getApiKeys();
     if (keys.length === 0) throw new Error('請先在設定中填入 API Key（點左下角 ⚙️）');
 
-    const context = buildContext();
+    const context = await buildContext(userMessage);
     const systemPrompt = SYSTEM_PROMPT.replace('{context}', context);
 
     // Build fallback model list: selected model first, then the rest
@@ -2437,13 +2613,23 @@
     for (var i = 0; i < sopFiles.length; i++) {
       var f = sopFiles[i];
       var checked = activeFileIds.has(f.id);
-      html += '<div style="display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:8px;' + (!checked ? 'opacity:0.45;' : '') + '"' +
+      var pinned = pinnedFileIds.has(f.id);
+      var indexed = isDocIndexed(f);
+      var pinStyle = pinned
+        ? 'flex-shrink:0;padding:3px 6px;border:1px solid #f59e0b;border-radius:6px;background:#fffbeb;color:#d97706;font-size:12px;cursor:pointer;'
+        : 'flex-shrink:0;padding:3px 6px;border:1px solid #e5e7eb;border-radius:6px;background:transparent;color:#9ca3af;font-size:12px;cursor:pointer;';
+      var indexBadge = indexed
+        ? '<span style="font-size:10px;color:#10b981;flex-shrink:0;" title="已建立語意索引">⚡</span>'
+        : '<span style="font-size:10px;color:#d1d5db;flex-shrink:0;" title="尚未索引">○</span>';
+      html += '<div style="display:flex;align-items:center;gap:6px;padding:5px 6px;border-radius:8px;' + (!checked && !pinned ? 'opacity:0.45;' : '') + '"' +
         ' onmouseover="this.style.background=\'#f0f4ff\'" onmouseout="this.style.background=\'transparent\'">' +
         '<input type="checkbox" ' + (checked ? 'checked' : '') + ' onchange="toggleFileActive(\'' + f.id + '\')" style="width:15px;height:15px;flex-shrink:0;cursor:pointer;accent-color:#4f8ef7;" />' +
+        '<button onclick="togglePin(\'' + f.id + '\')" style="' + pinStyle + '" title="' + (pinned ? '取消常駐' : '設為常駐（每次必定注入）') + '">📌</button>' +
         '<a href="' + (f.webViewLink || '#') + '" target="_blank" rel="noopener noreferrer"' +
         ' style="display:flex;flex-direction:column;flex:1;padding:4px 2px;text-decoration:none;color:#1a1a2e;min-width:0;">' +
-        '<span style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(f.name) + '</span>' +
+        '<span style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(f.name) + (pinned ? ' <span style="font-size:10px;color:#d97706;">常駐</span>' : '') + '</span>' +
         '</a>' +
+        indexBadge +
         '<button onclick="openSopEditor(' + i + ')" style="flex-shrink:0;padding:4px 10px;border:1px solid #d1d5db;border-radius:6px;background:#fff;color:#4f8ef7;font-size:11.5px;font-weight:500;cursor:pointer;white-space:nowrap;"' +
         ' onmouseover="this.style.background=\'#4f8ef7\';this.style.color=\'#fff\';this.style.borderColor=\'#4f8ef7\'"' +
         ' onmouseout="this.style.background=\'#fff\';this.style.color=\'#4f8ef7\';this.style.borderColor=\'#d1d5db\'">✏️ 編輯</button>' +
