@@ -1083,7 +1083,13 @@
       </h3>
       <ol style="margin:0 0 12px 18px;padding:0;">
         <li style="margin-bottom:8px;"><b>列出資料夾</b>：點「開啟文件庫」後，系統去 Google Drive 抓取指定資料夾裡的所有檔案清單。</li>
-        <li style="margin-bottom:8px;"><b>下載內容</b>：依檔案類型用對應方式取得內文（Google 文件會自動轉成純文字）。</li>
+        <li style="margin-bottom:8px;"><b>下載內容</b>：依檔案類型用對應方式取得內文（Google 文件會自動轉成純文字）。
+          <ul style="margin:6px 0 0 18px;">
+            <li><b>預設走匿名讀取</b>（API Key）：只要 Drive 資料夾設成「任何人有連結可檢視」，<b>使用者完全不需要登入 Google</b> 就能讀取文件。</li>
+            <li><b>遇到私人檔案才會跳登入</b>：如果某份文件 API Key 抓不到（403/401），系統會自動跳出 Google 登入要求 OAuth 授權，用使用者的身份再試一次。</li>
+            <li><b>編輯功能仍需登入</b>：用「✏️ 編輯」修改文件並存回 Drive 時，永遠需要 OAuth（寫入無法匿名）。</li>
+          </ul>
+        </li>
         <li style="margin-bottom:8px;"><b>本機快取 24 小時</b>：下載過的文件存在你的瀏覽器，24 小時內不會重複下載。</li>
         <li><b>背景建索引</b>：載入完成後，系統會自動為你<b>勾選的</b>文件建立語意索引（見下一段）。第一次使用預設全部勾選，之後會記住你的偏好。</li>
       </ol>
@@ -1279,7 +1285,7 @@
       <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:14px 18px;margin-bottom:10px;font-size:13.5px;">
         <div style="font-weight:700;color:#15803d;margin-bottom:8px;">🌐 會離開瀏覽器送出的內容</div>
         <ul style="margin:0;padding-left:20px;color:#166534;">
-          <li><b>送到 Google Drive</b>：登入授權 + 文件下載/上傳請求</li>
+          <li><b>送到 Google Drive</b>：API Key + 文件下載請求（讀取）；OAuth token + 上傳請求（編輯時才需要）</li>
           <li><b>送到 Gemini 語意搜尋服務</b>：你勾選的文件內容（建 embedding 時，每個 chunk 一次）、你的提問</li>
           <li><b>送到 Gemini 對話服務</b>：命中的文件全文 + 對話歷史 + 你的問題</li>
         </ul>
@@ -1952,39 +1958,27 @@
       let loadedCount = 0;
 
       // Check how many files need fresh download (not in cache)
-      const needDownload = files.filter(f => {
-        const c = fileCache[f.id];
-        return !c || (Date.now() - c.ts >= FILE_CACHE_TTL);
-      });
-
-      // Get OAuth token if any file needs to be downloaded
+      // Lazy OAuth: only request Google login if API Key (anonymous) access fails
       let oauthTokenForLoad = null;
-      if (needDownload.length > 0) {
-        const clientId = getOAuthClientId();
-        if (!clientId) {
-          statusEl.textContent = '⚠ 需要 OAuth Client ID';
-          statusEl.className = 'sop-status error';
-          document.getElementById('filesPickerList').innerHTML =
-            '<p style="font-size:13px;color:#f87171;padding:12px;text-align:center;">請先在 ⚙️ 設定中填入 Google OAuth Client ID，才能載入文件</p>';
-          return;
-        }
-        statusEl.textContent = '請登入 Google 以載入文件...';
+      let oauthAttempted = false;
+      async function lazyOAuth() {
+        if (oauthTokenForLoad) return oauthTokenForLoad;
+        if (oauthAttempted) return null;
+        oauthAttempted = true;
         try {
           oauthTokenForLoad = await requestGoogleAuth();
+          return oauthTokenForLoad;
         } catch(e) {
-          // If OAuth fails but all files have expired cache, use it anyway
-          const allHaveCache = files.every(f => fileCache[f.id]);
-          if (!allHaveCache) {
-            statusEl.textContent = '⚠ 登入取消，部分文件無法載入';
-            statusEl.className = 'sop-status error';
-          }
+          console.warn('OAuth 登入取消或失敗:', e.message);
+          return null;
         }
-        statusEl.textContent = `載入中 0/${files.length}...`;
       }
 
-      // Load each file: cache first, then OAuth download
+      statusEl.textContent = `載入中 0/${files.length}...`;
+
       for (const file of files) {
         const cleanName = file.name.replace(/\.[^.]+$/, '');
+        const isGoogleDoc = file.mimeType === 'application/vnd.google-apps.document';
 
         // Use cache if fresh
         const cached = fileCache[file.id];
@@ -1996,62 +1990,64 @@
           continue;
         }
 
-        // No fresh cache — need OAuth token to download
-        if (!oauthTokenForLoad) {
-          if (cached) {
-            console.warn(`⚠ ${cleanName} 使用過期快取（無 OAuth token）`);
-            sopFiles.push({ ...file, name: cleanName, originalName: file.name, content: cached.content });
-            loadedCount++;
-            statusEl.textContent = `載入中 ${loadedCount}/${files.length}...`;
+        const urlApiKey = isGoogleDoc
+          ? `https://www.googleapis.com/drive/v3/files/${file.id}/export?mimeType=text%2Fhtml&key=${DRIVE_API_KEY}`
+          : `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media&key=${DRIVE_API_KEY}`;
+        const urlNoKey = isGoogleDoc
+          ? `https://www.googleapis.com/drive/v3/files/${file.id}/export?mimeType=text%2Fhtml`
+          : `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`;
+
+        let content = null;
+        let lastError = null;
+
+        // Try 1: API Key only (works for "anyone with link" files, no login needed)
+        try {
+          const res = await fetch(urlApiKey);
+          if (res.ok) {
+            const text = await res.text();
+            content = isGoogleDoc ? googleDocHtmlToText(text) : text;
+          } else if (res.status === 401 || res.status === 403 || res.status === 404) {
+            lastError = `HTTP ${res.status} (API Key 無法存取，需要登入)`;
           } else {
-            console.warn(`❌ 跳過 ${file.name}（無快取且無 OAuth token）`);
+            lastError = `HTTP ${res.status}`;
           }
-          continue;
+        } catch(e) {
+          lastError = e.message;
         }
 
-        // Fetch with OAuth token (no CORS restriction, no API key rate limit)
-        for (let retry = 0; retry < 2; retry++) {
-          try {
-            let content = '';
-            const headers = { Authorization: `Bearer ${oauthTokenForLoad}` };
-            if (file.mimeType === 'application/vnd.google-apps.document') {
-              const res = await fetch(
-                `https://www.googleapis.com/drive/v3/files/${file.id}/export?mimeType=text%2Fhtml`,
-                { headers }
-              );
-              if (!res.ok) throw new Error(`HTTP ${res.status}`);
-              const html = await res.text();
-              content = googleDocHtmlToText(html);
-            } else {
-              const res = await fetch(
-                `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`,
-                { headers }
-              );
-              if (!res.ok) throw new Error(`HTTP ${res.status}`);
-              content = await res.text();
-            }
-            fileCache[file.id] = { content, ts: Date.now() };
-            writeFileCache(fileCache);
-            console.log(`✅ ${cleanName} (${content.length} 字)`);
-            sopFiles.push({ ...file, name: cleanName, originalName: file.name, content });
-            loadedCount++;
-            statusEl.textContent = `載入中 ${loadedCount}/${files.length}...`;
-            break;
-          } catch (e) {
-            if (retry === 0) {
-              console.warn(`⚠ ${file.name} 第一次失敗，重試...`, e.message);
-              await new Promise(r => setTimeout(r, 600));
-            } else {
-              if (cached) {
-                console.warn(`⚠ ${cleanName} 使用過期快取`);
-                sopFiles.push({ ...file, name: cleanName, originalName: file.name, content: cached.content });
-                loadedCount++;
-                statusEl.textContent = `載入中 ${loadedCount}/${files.length}...`;
+        // Try 2: OAuth (request login if not yet, for private files)
+        if (content === null) {
+          const token = await lazyOAuth();
+          if (token) {
+            try {
+              const res = await fetch(urlNoKey, { headers: { Authorization: `Bearer ${token}` } });
+              if (res.ok) {
+                const text = await res.text();
+                content = isGoogleDoc ? googleDocHtmlToText(text) : text;
               } else {
-                console.warn(`❌ 無法載入 ${file.name}:`, e.message);
+                lastError = `HTTP ${res.status}`;
               }
+            } catch(e) {
+              lastError = e.message;
             }
           }
+        }
+
+        // Success: cache + push
+        if (content !== null) {
+          fileCache[file.id] = { content, ts: Date.now() };
+          writeFileCache(fileCache);
+          console.log(`✅ ${cleanName} (${content.length} 字)`);
+          sopFiles.push({ ...file, name: cleanName, originalName: file.name, content });
+          loadedCount++;
+          statusEl.textContent = `載入中 ${loadedCount}/${files.length}...`;
+        } else if (cached) {
+          console.warn(`⚠ ${cleanName} 下載失敗，使用過期快取`);
+          sopFiles.push({ ...file, name: cleanName, originalName: file.name, content: cached.content });
+          loadedCount++;
+          statusEl.textContent = `載入中 ${loadedCount}/${files.length}...`;
+        } else {
+          console.warn(`❌ 無法載入 ${file.name}: ${lastError}`);
         }
       }
 
